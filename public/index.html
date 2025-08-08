@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+  <head>
+    <title>VTMR Web Survey</title>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; text-align: center; }
+      button { padding: 15px 30px; margin: 10px; font-size: 16px; cursor: pointer; }
+      .btn-a { background-color: #4CAF50; color: white; border: none; border-radius: 5px; }
+      .btn-b { background-color: #2196F3; color: white; border: none; border-radius: 5px; }
+      button:hover { opacity: 0.8; }
+    </style>
+  </head>
+  <body>
+    <h1>🎵 Video-to-Music Retrieval Survey</h1>
+    <p>Please choose your preference:</p>
+    <button class="btn-a" onclick="vote('A')">Option A</button>
+    <button class="btn-b" onclick="vote('B')">Option B</button>
+    <script>
+      async function vote(choice) {
+        await fetch('/vote', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({choice})
+        });
+        alert('Thank you for your choice: ' + choice);
+      }
+    </script>
+  </body>
+</html>
