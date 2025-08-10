@@ -10,25 +10,70 @@ app.use(express.json());
 
 const dataDir = path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-const resultFile = path.join(dataDir, 'results.json');
-if (!fs.existsSync(resultFile)) fs.writeFileSync(resultFile, '[]');
+const resultsFile = path.join(dataDir, 'results.json');
+if (!fs.existsSync(resultsFile)) fs.writeFileSync(resultsFile, '[]', 'utf8');
 
-app.post('/vote', (req, res) => {
-  const choice = req.body.choice || req.body.selection;
-  if (!choice) return res.status(400).json({ ok: false, error: 'no choice' });
-  const vote = { choice, ts: new Date().toISOString(), ip: req.ip };
-  const arr = JSON.parse(fs.readFileSync(resultFile, 'utf8'));
-  arr.push(vote);
-  fs.writeFileSync(resultFile, JSON.stringify(arr, null, 2));
-  res.json({ ok: true });
+const surveys = JSON.parse(fs.readFileSync(path.join(__dirname, 'config', 'surveys.json'), 'utf8'));
+
+const generatePairs = (survey) => {
+  const pairs = [];
+  const videos = survey.videos;
+  for (let i = 0; i < videos.length; i++) {
+    for (let j = i + 1; j < videos.length; j++) {
+      pairs.push([videos[i], videos[j]]);
+    }
+  }
+  return pairs;
+};
+
+// API to get all pairs from all surveys, shuffled
+app.get('/api/all-pairs', (req, res) => {
+  let allPairs = [];
+  surveys.forEach(survey => {
+    allPairs = allPairs.concat(generatePairs(survey));
+  });
+  // Shuffle the pairs
+  for (let i = allPairs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allPairs[i], allPairs[j]] = [allPairs[j], allPairs[i]];
+  }
+  res.json(allPairs);
+});
+
+app.post('/api/vote', (req, res) => {
+  const { pair, choice } = req.body;
+  if (!pair || !choice) {
+    return res.status(400).json({ ok: false, error: 'Missing required fields' });
+  }
+
+  const vote = {
+    pair,
+    choice,
+    winner: choice === 'A' ? pair[0] : pair[1],
+    loser: choice === 'A' ? pair[1] : pair[0],
+    ts: new Date().toISOString(),
+    ip: req.ip
+  };
+
+  fs.readFile(resultsFile, 'utf8', (err, data) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ ok: false, error: 'Could not read results file' });
+    }
+    const results = JSON.parse(data);
+    results.push(vote);
+    fs.writeFile(resultsFile, JSON.stringify(results, null, 2), 'utf8', (err) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ ok: false, error: 'Could not save results' });
+      }
+      res.json({ ok: true });
+    });
+  });
 });
 
 app.get('/results', (req, res) => {
-  res.sendFile(resultFile);
-});
-
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(resultsFile);
 });
 
 app.listen(PORT, '0.0.0.0', () => console.log(`Listening on ${PORT}`));

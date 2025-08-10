@@ -1,29 +1,94 @@
 <!doctype html>
 <html>
-  <head>
-    <title>VTMR Web Survey</title>
-    <style>
-      body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; text-align: center; }
-      button { padding: 15px 30px; margin: 10px; font-size: 16px; cursor: pointer; }
-      .btn-a { background-color: #4CAF50; color: white; border: none; border-radius: 5px; }
-      .btn-b { background-color: #2196F3; color: white; border: none; border-radius: 5px; }
-      button:hover { opacity: 0.8; }
-    </style>
-  </head>
-  <body>
-    <h1>🎵 Video-to-Music Retrieval Survey</h1>
-    <p>Please choose your preference:</p>
-    <button class="btn-a" onclick="vote('A')">Option A</button>
-    <button class="btn-b" onclick="vote('B')">Option B</button>
-    <script>
-      async function vote(choice) {
-        await fetch('/vote', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({choice})
-        });
-        alert('Thank you for your choice: ' + choice);
+<head>
+  <title>VTMR Web Survey</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; text-align: center; }
+    #survey-container { margin-bottom: 20px; }
+    #video-container { display: flex; justify-content: space-around; margin-bottom: 20px; }
+    video { width: 45%; border: 1px solid #ccc; }
+    button { padding: 15px 30px; margin: 10px; font-size: 16px; cursor: pointer; border-radius: 5px; border: none; }
+    #progress-container { margin-top: 20px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+  <h1>🎵 Video-to-Music Retrieval Survey</h1>
+
+  <div id="survey-container">
+    <div id="video-container">
+      <div>
+        <h3>Option A</h3>
+        <video id="video-a" controls muted></video>
+      </div>
+      <div>
+        <h3>Option B</h3>
+        <video id="video-b" controls muted></video>
+      </div>
+    </div>
+    <button id="vote-a">Choose A</button>
+    <button id="vote-b">Choose B</button>
+    <div id="progress-container">
+      <p id="progress-text"></p>
+    </div>
+  </div>
+
+  <div id="thank-you" class="hidden">
+    <h2>Thank you for completing the survey!</h2>
+    <p>Your responses have been recorded.</p>
+  </div>
+
+  <script>
+    let allPairs = [];
+    let currentPairIndex = 0;
+
+    const surveyContainer = document.getElementById('survey-container');
+    const videoA = document.getElementById('video-a');
+    const videoB = document.getElementById('video-b');
+    const voteA_btn = document.getElementById('vote-a');
+    const voteB_btn = document.getElementById('vote-b');
+    const progressText = document.getElementById('progress-text');
+    const thankYou = document.getElementById('thank-you');
+
+    // Fetch all pairs on load
+    window.addEventListener('load', async () => {
+      const res = await fetch('/api/all-pairs');
+      allPairs = await res.json();
+      if (allPairs.length > 0) {
+        loadPair();
+      } else {
+        surveyContainer.innerHTML = '<h2>No survey pairs found.</h2>';
       }
-    </script>
-  </body>
+    });
+
+    function loadPair() {
+      const pair = allPairs[currentPairIndex];
+      videoA.src = pair[0].file;
+      videoB.src = pair[1].file;
+      progressText.textContent = `Progress: ${currentPairIndex + 1} / ${allPairs.length}`;
+    }
+
+    async function vote(choice) {
+      const pair = allPairs[currentPairIndex];
+      await fetch('/api/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pair, choice })
+      });
+
+      currentPairIndex++;
+      if (currentPairIndex < allPairs.length) {
+        loadPair();
+      } else {
+        surveyContainer.classList.add('hidden');
+        thankYou.classList.remove('hidden');
+      }
+    }
+
+    voteA_btn.addEventListener('click', () => vote('A'));
+    voteB_btn.addEventListener('click', () => vote('B'));
+
+  </script>
+</body>
 </html>

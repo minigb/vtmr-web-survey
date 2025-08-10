@@ -1,0 +1,29 @@
+[
+  {
+    "id": "survey_01",
+    "name": "0",
+    "videos": [
+      { "id": "mixed_1", "file": "videos/0/mixed_1.mp4", "description": "Mixed 1" },
+      { "id": "mixed_2", "file": "videos/0/mixed_2.mp4", "description": "Mixed 2" },
+      { "id": "mixed_3", "file": "videos/0/mixed_3.mp4", "description": "Mixed 3" }
+    ]
+  },
+  {
+    "id": "survey_02",
+    "name": "1",
+    "videos": [
+      { "id": "mixed_1", "file": "videos/1/mixed_1.mp4", "description": "Mixed 1" },
+      { "id": "mixed_2", "file": "videos/1/mixed_2.mp4", "description": "Mixed 2" },
+      { "id": "mixed_3", "file": "videos/1/mixed_3.mp4", "description": "Mixed 3" }
+    ]
+  },
+  {
+    "id": "survey_03",
+    "name": "2",
+    "videos": [
+      { "id": "mixed_1", "file": "videos/2/mixed_1.mp4", "description": "Mixed 1" },
+      { "id": "mixed_2", "file": "videos/2/mixed_2.mp4", "description": "Mixed 2" },
+      { "id": "mixed_3", "file": "videos/2/mixed_3.mp4", "description": "Mixed 3" }
+    ]
+  }
+] 
