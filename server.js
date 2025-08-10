@@ -11,7 +11,7 @@ app.use(express.json());
 const dataDir = path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 const resultsFile = path.join(dataDir, 'results.json');
-if (!fs.existsSync(resultsFile)) fs.writeFileSync(resultsFile, '[]', 'utf8');
+if (!fs.existsSync(resultsFile)) fs.writeFileSync(resultsFile, '{}', 'utf8');
 
 const surveys = JSON.parse(fs.readFileSync(path.join(__dirname, 'config', 'surveys.json'), 'utf8'));
 
@@ -40,21 +40,26 @@ app.get('/api/all-pairs', (req, res) => {
   res.json(allPairs);
 });
 
-app.post('/api/vote', (req, res) => {
-  const { pair, choice, userId } = req.body;
-  if (!pair || !choice || !userId) {
+// API to check if a user ID already exists
+app.get('/api/check-user/:id', (req, res) => {
+  const userId = req.params.id;
+  fs.readFile(resultsFile, 'utf8', (err, data) => {
+    if (err) {
+      // If file doesn't exist or is unreadable, the user doesn't exist
+      return res.json({ exists: false });
+    }
+    const results = JSON.parse(data);
+    res.json({ exists: results.hasOwnProperty(userId) });
+  });
+});
+
+app.post('/api/submit', (req, res) => {
+  const { userId, votes } = req.body;
+  if (!userId || !votes || !Array.isArray(votes)) {
     return res.status(400).json({ ok: false, error: 'Missing required fields' });
   }
 
-  const vote = {
-    userId,
-    pair,
-    choice,
-    winner: choice === 'A' ? pair[0] : pair[1],
-    loser: choice === 'A' ? pair[1] : pair[0],
-    ts: new Date().toISOString(),
-    ip: req.ip
-  };
+  // We can add more validation for the votes array here if needed
 
   fs.readFile(resultsFile, 'utf8', (err, data) => {
     if (err) {
@@ -62,7 +67,10 @@ app.post('/api/vote', (req, res) => {
       return res.status(500).json({ ok: false, error: 'Could not read results file' });
     }
     const results = JSON.parse(data);
-    results.push(vote);
+
+    // Save the entire list of votes for the user, overwriting any previous data.
+    results[userId] = votes;
+
     fs.writeFile(resultsFile, JSON.stringify(results, null, 2), 'utf8', (err) => {
       if (err) {
         console.error(err);

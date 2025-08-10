@@ -64,27 +64,38 @@ This project uses a Docker-based development workflow. See `DEVELOPMENT.md` for 
 
 ## Data Analysis
 
-The survey results are stored in `data/results.json`. Each entry in the JSON array represents a single vote and contains the following information:
+The survey results are stored in `data/results.json`. The file contains a single JSON object where each key is a participant's ID. Under each ID is a list of their final votes, submitted as a batch at the end of the survey.
 
 ```json
 {
-  "userId": "participant_01",
-  "pair": [
-    { "id": "video_01a", "file": "...", "description": "..." },
-    { "id": "video_01b", "file": "...", "description": "..." }
-  ],
-  "choice": "A",
-  "winner": { "id": "video_01a", "file": "...", "description": "..." },
-  "loser": { "id": "video_01b", "file": "...", "description": "..." },
-  "ts": "2023-10-27T12:00:00.000Z",
-  "ip": "::1"
+  "participant_01": [
+    {
+      "pair": [
+        { "id": "video_01a", "file": "...", "description": "..." },
+        { "id": "video_01b", "file": "...", "description": "..." }
+      ],
+      "choice": "A",
+      "winner": { "id": "video_01a", "file": "...", "description": "..." },
+      "loser": { "id": "video_01b", "file": "...", "description": "..." },
+      "ts": "2023-10-27T12:00:00.000Z"
+    },
+    {
+      "pair": [
+        { "id": "video_02a", "file": "...", "description": "..." },
+        { "id": "video_02c", "file": "...", "description": "..." }
+      ],
+      "choice": "B",
+      "winner": { "id": "video_02c", "file": "...", "description": "..." },
+      "loser": { "id": "video_02a", "file": "...", "description": "..." },
+      "ts": "2023-10-27T12:05:10.000Z"
+    }
+  ]
 }
 ```
 
--   **`userId`**: The ID of the participant who submitted the vote.
+Each vote object in the array contains:
 -   **`pair`**: The pair of videos that were presented to the user.
 -   **`choice`**: The option the user selected (`"A"` or `"B"`).
 -   **`winner`**: The full object of the video the user chose.
 -   **`loser`**: The full object of the video the user did not choose.
--   **`ts`**: The timestamp of the vote.
--   **`ip`**: The IP address of the user.
+-   **`ts`**: The timestamp of when the vote was recorded on the client side.
