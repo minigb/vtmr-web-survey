@@ -41,12 +41,13 @@ app.get('/api/all-pairs', (req, res) => {
 });
 
 app.post('/api/vote', (req, res) => {
-  const { pair, choice } = req.body;
-  if (!pair || !choice) {
+  const { pair, choice, userId } = req.body;
+  if (!pair || !choice || !userId) {
     return res.status(400).json({ ok: false, error: 'Missing required fields' });
   }
 
   const vote = {
+    userId,
     pair,
     choice,
     winner: choice === 'A' ? pair[0] : pair[1],

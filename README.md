@@ -68,6 +68,7 @@ The survey results are stored in `data/results.json`. Each entry in the JSON arr
 
 ```json
 {
+  "userId": "participant_01",
   "pair": [
     { "id": "video_01a", "file": "...", "description": "..." },
     { "id": "video_01b", "file": "...", "description": "..." }
@@ -80,6 +81,7 @@ The survey results are stored in `data/results.json`. Each entry in the JSON arr
 }
 ```
 
+-   **`userId`**: The ID of the participant who submitted the vote.
 -   **`pair`**: The pair of videos that were presented to the user.
 -   **`choice`**: The option the user selected (`"A"` or `"B"`).
 -   **`winner`**: The full object of the video the user chose.

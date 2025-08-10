@@ -3,11 +3,12 @@
 <head>
   <title>VTMR Web Survey</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; text-align: center; }
+    body { font-family: Arial, sans-serif; max-width: 1200px; margin: 50px auto; text-align: center; }
     #survey-container { margin-bottom: 20px; }
     #video-container { display: flex; justify-content: space-around; margin-bottom: 20px; }
-    video { width: 45%; border: 1px solid #ccc; }
-    button { padding: 15px 30px; margin: 10px; font-size: 16px; cursor: pointer; border-radius: 5px; border: none; }
+    video { width: 80%; border: 1px solid #ccc; }
+    .choice-btn { padding: 15px 30px; margin: 10px; font-size: 16px; cursor: pointer; border-radius: 5px; border: none; }
+    #previous-pair { padding: 8px 15px; font-size: 12px; margin-top: 10px; }
     #progress-container { margin-top: 20px; }
     .hidden { display: none; }
   </style>
@@ -16,21 +17,29 @@
 
   <h1>🎵 Video-to-Music Retrieval Survey</h1>
 
-  <div id="survey-container">
+  <div id="welcome-container">
+    <h2>Welcome to the Survey</h2>
+    <p>Please enter your participant ID to begin.</p>
+    <input type="text" id="user-id" placeholder="Enter your ID">
+    <button id="start-survey">Start Survey</button>
+  </div>
+
+  <div id="survey-container" class="hidden">
     <div id="video-container">
       <div>
         <h3>Option A</h3>
-        <video id="video-a" controls muted></video>
+        <video id="video-a" controls></video>
       </div>
       <div>
         <h3>Option B</h3>
-        <video id="video-b" controls muted></video>
+        <video id="video-b" controls></video>
       </div>
     </div>
-    <button id="vote-a">Choose A</button>
-    <button id="vote-b">Choose B</button>
+    <button id="vote-a" class="choice-btn">Choose A</button>
+    <button id="vote-b" class="choice-btn">Choose B</button>
     <div id="progress-container">
       <p id="progress-text"></p>
+      <button id="previous-pair">Previous</button>
     </div>
   </div>
 
@@ -42,27 +51,45 @@
   <script>
     let allPairs = [];
     let currentPairIndex = 0;
+    let userId = '';
 
+    const welcomeContainer = document.getElementById('welcome-container');
+    const userIdInput = document.getElementById('user-id');
+    const startSurveyBtn = document.getElementById('start-survey');
     const surveyContainer = document.getElementById('survey-container');
     const videoA = document.getElementById('video-a');
     const videoB = document.getElementById('video-b');
+    const previousPairBtn = document.getElementById('previous-pair');
     const voteA_btn = document.getElementById('vote-a');
     const voteB_btn = document.getElementById('vote-b');
     const progressText = document.getElementById('progress-text');
     const thankYou = document.getElementById('thank-you');
 
+    // Start Survey
+    startSurveyBtn.addEventListener('click', () => {
+      userId = userIdInput.value.trim();
+      if (!userId) {
+        alert('Please enter a participant ID.');
+        return;
+      }
+      welcomeContainer.classList.add('hidden');
+      loadSurvey();
+    });
+
     // Fetch all pairs on load
-    window.addEventListener('load', async () => {
+    async function loadSurvey() {
       const res = await fetch('/api/all-pairs');
       allPairs = await res.json();
       if (allPairs.length > 0) {
+        surveyContainer.classList.remove('hidden');
         loadPair();
       } else {
         surveyContainer.innerHTML = '<h2>No survey pairs found.</h2>';
       }
-    });
+    }
 
     function loadPair() {
+      previousPairBtn.disabled = currentPairIndex === 0;
       const pair = allPairs[currentPairIndex];
       videoA.src = pair[0].file;
       videoB.src = pair[1].file;
@@ -74,7 +101,7 @@
       await fetch('/api/vote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pair, choice })
+        body: JSON.stringify({ pair, choice, userId })
       });
 
       currentPairIndex++;
@@ -85,6 +112,13 @@
         thankYou.classList.remove('hidden');
       }
     }
+
+    previousPairBtn.addEventListener('click', () => {
+      if (currentPairIndex > 0) {
+        currentPairIndex--;
+        loadPair();
+      }
+    });
 
     voteA_btn.addEventListener('click', () => vote('A'));
     voteB_btn.addEventListener('click', () => vote('B'));
