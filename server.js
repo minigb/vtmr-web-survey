@@ -12,7 +12,7 @@ app.use(express.json());
 const dataDir = path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 const resultsFile = path.join(dataDir, 'results.json');
-if (!fs.existsSync(resultsFile)) fs.writeFileSync(resultsFile, '{}', 'utf8');
+if (!fs.existsSync(resultsFile) || fs.readFileSync(resultsFile, 'utf8').trim() === '') fs.writeFileSync(resultsFile, '{}', 'utf8');
 
 const surveys = JSON.parse(fs.readFileSync(path.join(__dirname, 'config', 'surveys.json'), 'utf8'));
 
