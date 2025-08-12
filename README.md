@@ -21,7 +21,7 @@ This project is a web-based survey tool for Video-to-Music Retrieval (VTMR) rese
 
 ### 1. Add Your Media Files
 
--   Place your pre-combined video files (with audio) in the `public/videos/` directory.
+-   Place your pre-combined video files (with audio) in the `videos/` directory.
 
 ### 2. Configure Your Surveys
 

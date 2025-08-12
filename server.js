@@ -5,6 +5,7 @@ const app = express();
 const PORT = process.env.PORT || 5555;
 
 app.use(express.static('public'));
+app.use('/videos', express.static('videos'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
