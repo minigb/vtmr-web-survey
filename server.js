@@ -16,12 +16,86 @@ if (!fs.existsSync(resultsFile)) fs.writeFileSync(resultsFile, '{}', 'utf8');
 
 const surveys = JSON.parse(fs.readFileSync(path.join(__dirname, 'config', 'surveys.json'), 'utf8'));
 
+// Create anonymous video mapping to hide real file paths
+const videoMapping = new Map();
+const reverseMapping = new Map();
+let videoCounter = 1;
+
+function createAnonymousMapping() {
+  videoMapping.clear();
+  reverseMapping.clear();
+  
+  // Collect all video files first
+  const allVideoFiles = [];
+  surveys.forEach(survey => {
+    survey.videos.forEach(video => {
+      allVideoFiles.push(video.file);
+    });
+  });
+  
+  // Create shuffled anonymous IDs
+  const anonymousIds = [];
+  for (let i = 1; i <= allVideoFiles.length; i++) {
+    anonymousIds.push(`anon_video_${i.toString().padStart(3, '0')}`);
+  }
+  
+  // Shuffle the anonymous IDs using Fisher-Yates algorithm
+  for (let i = anonymousIds.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [anonymousIds[i], anonymousIds[j]] = [anonymousIds[j], anonymousIds[i]];
+  }
+  
+  // Map shuffled anonymous IDs to video files
+  allVideoFiles.forEach((videoFile, index) => {
+    const anonId = anonymousIds[index];
+    videoMapping.set(anonId, videoFile);
+    reverseMapping.set(videoFile, anonId);
+  });
+  
+  console.log(`🔀 Created ${allVideoFiles.length} shuffled anonymous video mappings`);
+}
+
+// Initialize mapping (will be refreshed on startup via the Python script)
+createAnonymousMapping();
+
+// Refresh mappings when surveys.json is updated
+function refreshMappings() {
+  try {
+    const updatedSurveys = JSON.parse(fs.readFileSync(path.join(__dirname, 'config', 'surveys.json'), 'utf8'));
+    surveys.length = 0; // Clear existing array
+    surveys.push(...updatedSurveys); // Add updated surveys
+    createAnonymousMapping();
+    console.log('📋 Video mappings refreshed');
+  } catch (error) {
+    console.error('Error refreshing mappings:', error);
+  }
+}
+
+// API endpoint to refresh mappings (called by Python script)
+app.post('/api/refresh-mappings', (req, res) => {
+  refreshMappings();
+  res.json({ ok: true, message: 'Mappings refreshed' });
+});
+
 const generatePairs = (survey) => {
   const pairs = [];
   const videos = survey.videos;
   for (let i = 0; i < videos.length; i++) {
     for (let j = i + 1; j < videos.length; j++) {
-      pairs.push([videos[i], videos[j]]);
+      // Create anonymized video objects
+      const anonVideo1 = {
+        id: videos[i].id,
+        file: reverseMapping.get(videos[i].file), // Use anonymous ID
+        description: videos[i].description,
+        originalFile: videos[i].file // Keep for server-side tracking
+      };
+      const anonVideo2 = {
+        id: videos[j].id,
+        file: reverseMapping.get(videos[j].file), // Use anonymous ID
+        description: videos[j].description,
+        originalFile: videos[j].file // Keep for server-side tracking
+      };
+      pairs.push([anonVideo1, anonVideo2]);
     }
   }
   return pairs;
@@ -39,6 +113,23 @@ app.get('/api/all-pairs', (req, res) => {
     [allPairs[i], allPairs[j]] = [allPairs[j], allPairs[i]];
   }
   res.json(allPairs);
+});
+
+// API to serve anonymous videos
+app.get('/api/video/:anonId', (req, res) => {
+  const anonId = req.params.anonId;
+  const realPath = videoMapping.get(anonId);
+  
+  if (!realPath) {
+    return res.status(404).json({ error: 'Video not found' });
+  }
+  
+  const videoPath = path.join(__dirname, realPath);
+  if (!fs.existsSync(videoPath)) {
+    return res.status(404).json({ error: 'Video file not found' });
+  }
+  
+  res.sendFile(videoPath);
 });
 
 // API to check if a user ID already exists
@@ -60,7 +151,22 @@ app.post('/api/submit', (req, res) => {
     return res.status(400).json({ ok: false, error: 'Missing required fields' });
   }
 
-  // We can add more validation for the votes array here if needed
+  // Map anonymous video IDs back to original file paths for research data
+  const votesWithOriginalPaths = votes.map(vote => ({
+    ...vote,
+    pair: vote.pair.map(video => ({
+      ...video,
+      file: video.originalFile || video.file // Use original file path if available
+    })),
+    winner: {
+      ...vote.winner,
+      file: vote.winner.originalFile || vote.winner.file
+    },
+    loser: {
+      ...vote.loser,
+      file: vote.loser.originalFile || vote.loser.file
+    }
+  }));
 
   fs.readFile(resultsFile, 'utf8', (err, data) => {
     if (err) {
@@ -69,8 +175,8 @@ app.post('/api/submit', (req, res) => {
     }
     const results = JSON.parse(data);
 
-    // Save the entire list of votes for the user, overwriting any previous data.
-    results[userId] = votes;
+    // Save the votes with original file paths for research analysis
+    results[userId] = votesWithOriginalPaths;
 
     fs.writeFile(resultsFile, JSON.stringify(results, null, 2), 'utf8', (err) => {
       if (err) {

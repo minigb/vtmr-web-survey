@@ -130,8 +130,9 @@
       updateSelectionStyle();
 
       const pair = allPairs[currentPairIndex];
-      videoA.src = pair[0].file;
-      videoB.src = pair[1].file;
+      // Use anonymous video API endpoints
+      videoA.src = `/api/video/${pair[0].file}`;
+      videoB.src = `/api/video/${pair[1].file}`;
       progressText.textContent = `Progress: ${currentPairIndex + 1} / ${allPairs.length}`;
     }
 
