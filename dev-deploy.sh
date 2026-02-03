@@ -13,7 +13,7 @@ sudo docker build -t vtmr-web-survey .
 
 # Run new container
 echo "Starting new container..."
-sudo docker run -d -p 5555:5555 --name vtmr-web-survey-container vtmr-web-survey
+sudo docker run -d -p 5555:5555 -v $(pwd)/data:/app/data -v $(pwd)/videos:/app/videos --name vtmr-web-survey-container vtmr-web-survey
 
 # Show status
 echo "✅ Deployment complete!"

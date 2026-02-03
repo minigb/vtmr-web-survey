@@ -1,2 +1,6 @@
 # Survey data
 data/
+videos/
+
+# Analysis results
+*.csv

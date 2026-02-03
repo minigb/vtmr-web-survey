@@ -1,29 +1,238 @@
 <!doctype html>
 <html>
-  <head>
-    <title>VTMR Web Survey</title>
-    <style>
-      body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; text-align: center; }
-      button { padding: 15px 30px; margin: 10px; font-size: 16px; cursor: pointer; }
-      .btn-a { background-color: #4CAF50; color: white; border: none; border-radius: 5px; }
-      .btn-b { background-color: #2196F3; color: white; border: none; border-radius: 5px; }
-      button:hover { opacity: 0.8; }
-    </style>
-  </head>
-  <body>
-    <h1>🎵 Video-to-Music Retrieval Survey</h1>
-    <p>Please choose your preference:</p>
-    <button class="btn-a" onclick="vote('A')">Option A</button>
-    <button class="btn-b" onclick="vote('B')">Option B</button>
-    <script>
-      async function vote(choice) {
-        await fetch('/vote', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({choice})
-        });
-        alert('Thank you for your choice: ' + choice);
+<head>
+  <title>VTMR Web Survey</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 1200px; margin: 50px auto; text-align: center; }
+    #survey-container { margin-bottom: 20px; }
+    #video-container { display: flex; justify-content: space-around; margin-bottom: 20px; }
+    video { width: 80%; border: 1px solid #ccc; }
+    .choice-btn { padding: 15px 30px; margin: 10px; font-size: 16px; cursor: pointer; border-radius: 5px; border: 2px solid transparent; }
+    .choice-btn.selected { border-color: #007bff; }
+    #previous-pair, #next-pair { padding: 8px 15px; font-size: 12px; margin-top: 10px; }
+    #submit-survey { padding: 15px 30px; font-size: 16px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    #progress-container { margin-top: 20px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+  <h1>🎵 Video-to-Music Retrieval Survey</h1>
+
+  <div id="welcome-container">
+    <h2>Welcome to the Survey</h2>
+    <p>Please enter your participant ID to begin.</p>
+    <input type="text" id="user-id" placeholder="Enter your ID">
+    <button id="start-survey">Start Survey</button>
+  </div>
+
+  <div id="survey-container" class="hidden">
+    <div id="video-container">
+      <div>
+        <h3>A</h3>
+        <video id="video-a" controls></video>
+      </div>
+      <div>
+        <h3>B</h3>
+        <video id="video-b" controls></video>
+      </div>
+    </div>
+    <div id="questions-container" style="margin-top: 20px; text-align: left; display: inline-block;">
+      <div class="question-block">
+        <p>1) <strong>Global Alignment:</strong> Which background music better matches the overall content and mood of the video?</p>
+        <button class="choice-btn q1-btn" data-q="global" data-choice="A">A</button>
+        <button class="choice-btn q1-btn" data-q="global" data-choice="B">B</button>
+      </div>
+      <div class="question-block">
+        <p>2) <strong>Temporal Alignment:</strong> Which background music is better temporally aligned with the video’s pacing and visual changes?</p>
+        <button class="choice-btn q2-btn" data-q="temporal" data-choice="A">A</button>
+        <button class="choice-btn q2-btn" data-q="temporal" data-choice="B">B</button>
+      </div>
+      <div class="question-block">
+        <p>3) <strong>Music Audio Quality:</strong> Which music has better audio quality as a standalone track?</p>
+        <button class="choice-btn q3-btn" data-q="quality" data-choice="A">A</button>
+        <button class="choice-btn q3-btn" data-q="quality" data-choice="B">B</button>
+      </div>
+    </div>
+    <div id="navigation-container" style="margin-top: 20px;">
+      <button id="previous-pair">Previous</button>
+      <button id="next-pair">Next</button>
+      <button id="submit-survey" class="hidden">Submit</button>
+    </div>
+    <div id="progress-container">
+      <p id="progress-text"></p>
+    </div>
+  </div>
+
+  <div id="thank-you" class="hidden">
+    <h2>Thank you for completing the survey!</h2>
+    <p>Your responses have been recorded.</p>
+  </div>
+
+  <script>
+    let allPairs = [];
+    let userChoices = [];
+    let currentPairIndex = 0;
+    let userId = '';
+
+    const welcomeContainer = document.getElementById('welcome-container');
+    const userIdInput = document.getElementById('user-id');
+    const startSurveyBtn = document.getElementById('start-survey');
+    const surveyContainer = document.getElementById('survey-container');
+    const videoA = document.getElementById('video-a');
+    const videoB = document.getElementById('video-b');
+    const voteA_btn = document.getElementById('vote-a');
+    const voteB_btn = document.getElementById('vote-b');
+    const previousPairBtn = document.getElementById('previous-pair');
+    const nextPairBtn = document.getElementById('next-pair');
+    const submitSurveyBtn = document.getElementById('submit-survey');
+    const progressText = document.getElementById('progress-text');
+    const thankYou = document.getElementById('thank-you');
+
+    // Start Survey
+    startSurveyBtn.addEventListener('click', async () => {
+      userId = userIdInput.value.trim();
+      if (!userId) {
+        alert('Please enter a participant ID.');
+        return;
       }
-    </script>
-  </body>
+
+      // Check for duplicate ID
+      const res = await fetch(`/api/check-user/${userId}`);
+      const { exists } = await res.json();
+      if (exists) {
+        alert('This participant ID has already been used. Please enter a unique ID.');
+        return;
+      }
+
+      welcomeContainer.classList.add('hidden');
+      loadSurvey();
+    });
+
+    // Fetch all pairs on load
+    async function loadSurvey() {
+      const res = await fetch('/api/all-pairs');
+      allPairs = await res.json();
+      if (allPairs.length > 0) {
+        userChoices = new Array(allPairs.length).fill(null);
+        surveyContainer.classList.remove('hidden');
+        loadPair();
+      } else {
+        surveyContainer.innerHTML = '<h2>No survey pairs found.</h2>';
+      }
+    }
+
+    function updateSelectionStyle() {
+      // Reset all button styles
+      document.querySelectorAll('.choice-btn').forEach(btn => btn.classList.remove('selected'));
+
+      // Highlight selected choices if they exist
+      const currentChoices = userChoices[currentPairIndex] || {};
+      
+      if (currentChoices.global) {
+        document.querySelector(`.q1-btn[data-choice="${currentChoices.global}"]`).classList.add('selected');
+      }
+      if (currentChoices.temporal) {
+        document.querySelector(`.q2-btn[data-choice="${currentChoices.temporal}"]`).classList.add('selected');
+      }
+      if (currentChoices.quality) {
+        document.querySelector(`.q3-btn[data-choice="${currentChoices.quality}"]`).classList.add('selected');
+      }
+    }
+
+    function loadPair() {
+      // Update button states
+      previousPairBtn.disabled = currentPairIndex === 0;
+      nextPairBtn.disabled = currentPairIndex === allPairs.length - 1;
+      submitSurveyBtn.classList.toggle('hidden', currentPairIndex !== allPairs.length - 1);
+
+      updateSelectionStyle();
+
+      const pair = allPairs[currentPairIndex];
+      // Use anonymous video API endpoints
+      videoA.src = `/api/video/${pair[0].file}`;
+      videoB.src = `/api/video/${pair[1].file}`;
+      progressText.textContent = `Progress: ${currentPairIndex + 1} / ${allPairs.length}`;
+    }
+
+    function recordChoice(question, choice) {
+      if (!userChoices[currentPairIndex]) {
+        userChoices[currentPairIndex] = {};
+      }
+      userChoices[currentPairIndex][question] = choice;
+      updateSelectionStyle();
+    }
+
+    // Add event listeners for all choice buttons
+    document.querySelectorAll('.q1-btn').forEach(btn => {
+      btn.addEventListener('click', () => recordChoice('global', btn.dataset.choice));
+    });
+    document.querySelectorAll('.q2-btn').forEach(btn => {
+      btn.addEventListener('click', () => recordChoice('temporal', btn.dataset.choice));
+    });
+    document.querySelectorAll('.q3-btn').forEach(btn => {
+      btn.addEventListener('click', () => recordChoice('quality', btn.dataset.choice));
+    });
+
+    previousPairBtn.addEventListener('click', () => {
+      if (currentPairIndex > 0) {
+        currentPairIndex--;
+        loadPair();
+      }
+    });
+
+    nextPairBtn.addEventListener('click', () => {
+      if (currentPairIndex < allPairs.length - 1) {
+        currentPairIndex++;
+        loadPair();
+      }
+    });
+
+    submitSurveyBtn.addEventListener('click', async () => {
+      // Validate that all questions are answered for all pairs
+      const allAnswered = userChoices.every(choice => 
+        choice && choice.global && choice.temporal && choice.quality
+      );
+
+      if (!allAnswered || userChoices.length < allPairs.length) {
+        alert('Please answer all 3 questions for every video pair before submitting.');
+        return;
+      }
+
+      const votes = allPairs.map((pair, index) => {
+        const choices = userChoices[index];
+        return {
+          pair,
+          choices: choices,
+          // Store winners/losers for each metric
+          results: {
+            global: {
+              winner: choices.global === 'A' ? pair[0] : pair[1],
+              loser: choices.global === 'A' ? pair[1] : pair[0]
+            },
+            temporal: {
+              winner: choices.temporal === 'A' ? pair[0] : pair[1],
+              loser: choices.temporal === 'A' ? pair[1] : pair[0]
+            },
+            quality: {
+              winner: choices.quality === 'A' ? pair[0] : pair[1],
+              loser: choices.quality === 'A' ? pair[1] : pair[0]
+            }
+          },
+          ts: new Date().toISOString()
+        };
+      });
+
+      await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, votes })
+      });
+
+      surveyContainer.classList.add('hidden');
+      thankYou.classList.remove('hidden');
+    });
+
+  </script>
+</body>
 </html>
