@@ -85,15 +85,11 @@ const generatePairs = (survey) => {
       // Create anonymized video objects
       const anonVideo1 = {
         id: videos[i].id,
-        file: reverseMapping.get(videos[i].file), // Use anonymous ID
-        description: videos[i].description,
-        originalFile: videos[i].file // Keep for server-side tracking
+        file: reverseMapping.get(videos[i].file) // Use anonymous ID
       };
       const anonVideo2 = {
         id: videos[j].id,
-        file: reverseMapping.get(videos[j].file), // Use anonymous ID
-        description: videos[j].description,
-        originalFile: videos[j].file // Keep for server-side tracking
+        file: reverseMapping.get(videos[j].file) // Use anonymous ID
       };
       pairs.push([anonVideo1, anonVideo2]);
     }
@@ -152,21 +148,30 @@ app.post('/api/submit', (req, res) => {
   }
 
   // Map anonymous video IDs back to original file paths for research data
-  const votesWithOriginalPaths = votes.map(vote => ({
-    ...vote,
-    pair: vote.pair.map(video => ({
+  const votesWithOriginalPaths = votes.map(vote => {
+    // Helper to map a video object back to original path
+    const mapVideo = (video) => ({
       ...video,
-      file: video.originalFile || video.file // Use original file path if available
-    })),
-    winner: {
-      ...vote.winner,
-      file: vote.winner.originalFile || vote.winner.file
-    },
-    loser: {
-      ...vote.loser,
-      file: vote.loser.originalFile || vote.loser.file
+      file: videoMapping.get(video.file) || video.file // Resolve anonymous ID to real path
+    });
+
+    const mappedResults = {};
+    // Map winners and losers for each metric
+    if (vote.results) {
+      for (const [metric, result] of Object.entries(vote.results)) {
+        mappedResults[metric] = {
+          winner: mapVideo(result.winner),
+          loser: mapVideo(result.loser)
+        };
+      }
     }
-  }));
+
+    return {
+      ...vote,
+      pair: vote.pair.map(mapVideo),
+      results: mappedResults
+    };
+  });
 
   fs.readFile(resultsFile, 'utf8', (err, data) => {
     if (err) {
@@ -175,7 +180,7 @@ app.post('/api/submit', (req, res) => {
     }
     const results = JSON.parse(data);
 
-    // Save the votes with original file paths for research analysis
+    // Save the votes with original file paths
     results[userId] = votesWithOriginalPaths;
 
     fs.writeFile(resultsFile, JSON.stringify(results, null, 2), 'utf8', (err) => {

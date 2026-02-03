@@ -29,8 +29,7 @@ def generate_video_metadata():
             video_id = os.path.splitext(video_file)[0]
             videos.append({
                 "id": video_id,
-                "file": f"videos/{subdir}/{video_file}",
-                "description": video_id.replace('_', ' ').title()
+                "file": f"videos/{subdir}/{video_file}"
             })
         
         surveys.append({
