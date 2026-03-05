@@ -121,6 +121,7 @@ def generate_assignments(
     balanced_questions: int,
     random_questions: int,
     random_exclude_option: str,
+    max_random_per_case: int,
     seed: int,
 ) -> dict:
     total_questions = users * questions_per_user
@@ -225,25 +226,20 @@ def generate_assignments(
     capacity = {case_id: len(occurrences_per_case[case_id]) for case_id in eligible_case_ids}
     random_needed_per_case: Counter[str] = Counter()
     if random_questions > 0:
-        # Retry if a very unlikely overflow appears (asked count exceeds available occurrences).
-        max_attempts = 2000
-        for _ in range(max_attempts):
-            draws = [rng.choice(eligible_case_ids) for _ in range(random_questions)]
-            candidate = Counter(draws)
-            if all(candidate[case_id] <= capacity.get(case_id, 0) for case_id in candidate):
-                random_needed_per_case = candidate
-                break
-        else:
-            # Guaranteed fallback: sample without replacement from a flattened occurrence-capacity pool.
-            weighted_pool: list[str] = []
-            for case_id in eligible_case_ids:
-                weighted_pool.extend([case_id] * capacity.get(case_id, 0))
-            if len(weighted_pool) < random_questions:
-                raise ValueError(
-                    f"Not enough eligible occurrences for random sampling: "
-                    f"need {random_questions}, have {len(weighted_pool)}"
-                )
-            random_needed_per_case = Counter(rng.sample(weighted_pool, random_questions))
+        if max_random_per_case < 1:
+            raise ValueError(f"max_random_per_case must be >= 1, got {max_random_per_case}")
+        # Build capped pool so each case appears at most max_random_per_case times.
+        capped_pool: list[str] = []
+        for case_id in eligible_case_ids:
+            cap = min(max_random_per_case, capacity.get(case_id, 0))
+            if cap > 0:
+                capped_pool.extend([case_id] * cap)
+        if len(capped_pool) < random_questions:
+            raise ValueError(
+                "Random sampling infeasible with current cap. "
+                f"need={random_questions}, pool={len(capped_pool)}, max_random_per_case={max_random_per_case}"
+            )
+        random_needed_per_case = Counter(rng.sample(capped_pool, random_questions))
 
     for case_id, random_needed in random_needed_per_case.items():
         if random_needed <= 0:
@@ -260,8 +256,39 @@ def generate_assignments(
         user_questions = assignments[user_id]
         if len(user_questions) != questions_per_user:
             raise ValueError(f"{user_id} has {len(user_questions)} questions, expected {questions_per_user}")
-        rng.shuffle(user_questions)
-        for i, q in enumerate(user_questions, start=1):
+
+        # Enforce question order as two rounds:
+        # - first 20 questions: each video appears exactly once
+        # - next 20 questions: each video appears exactly once
+        by_video_questions: dict[str, list[dict]] = defaultdict(list)
+        for q in user_questions:
+            by_video_questions[q["video_id"]].append(q)
+        if len(by_video_questions) != num_videos:
+            raise ValueError(
+                f"{user_id} has {len(by_video_questions)} videos, expected {num_videos}"
+            )
+        for video_id, qs in by_video_questions.items():
+            if len(qs) != 2:
+                raise ValueError(f"{user_id} video {video_id} has {len(qs)} questions, expected 2")
+            rng.shuffle(qs)
+
+        first_round_video_order = video_ids[:]
+        second_round_video_order = video_ids[:]
+        rng.shuffle(first_round_video_order)
+        rng.shuffle(second_round_video_order)
+
+        ordered_questions: list[dict] = []
+        for video_id in first_round_video_order:
+            ordered_questions.append(by_video_questions[video_id].pop())
+        for video_id in second_round_video_order:
+            ordered_questions.append(by_video_questions[video_id].pop())
+
+        if len(ordered_questions) != questions_per_user:
+            raise ValueError(
+                f"{user_id} ordered questions length={len(ordered_questions)}, expected {questions_per_user}"
+            )
+        assignments[user_id] = ordered_questions
+        for i, q in enumerate(assignments[user_id], start=1):
             q["question_no"] = i
 
     return {
@@ -618,6 +645,7 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--balanced-questions", type=int, default=1170)
     parser.add_argument("--random-questions", type=int, default=30)
     parser.add_argument("--random-exclude-option", type=str, default="vidmuse")
+    parser.add_argument("--max-random-per-case", type=int, default=2)
     parser.add_argument("--seed", type=int, default=20260305)
     parser.add_argument("--output-json", type=Path, default=Path("data/test_case_assignments.json"))
     parser.add_argument("--output-csv", type=Path, default=Path("data/test_case_assignments.csv"))
@@ -650,6 +678,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         balanced_questions=args.balanced_questions,
         random_questions=args.random_questions,
         random_exclude_option=args.random_exclude_option,
+        max_random_per_case=args.max_random_per_case,
         seed=args.seed,
     )
     summary = build_summary(assignments, cases, per_video_candidates)
@@ -664,6 +693,7 @@ def main(argv: Iterable[str] | None = None) -> int:
             "balanced_questions": args.balanced_questions,
             "random_questions": args.random_questions,
             "random_exclude_option": args.random_exclude_option,
+            "max_random_per_case": args.max_random_per_case,
         },
         "summary": summary,
         "users": assignments["users"],
