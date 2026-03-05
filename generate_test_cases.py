@@ -370,6 +370,164 @@ def write_csv(assignments: dict, output_csv: Path) -> None:
         writer.writerows(rows)
 
 
+def generate_token(prefix: str, rng: random.Random, used: set[str], nbytes: int = 12) -> str:
+    while True:
+        token = f"{prefix}_{rng.getrandbits(nbytes * 8):0{nbytes * 2}x}"
+        if token not in used:
+            used.add(token)
+            return token
+
+
+def build_public_payload(
+    payload: dict,
+    cases: list[Case],
+    seed: int,
+) -> tuple[dict, dict]:
+    """Create participant-safe payload + private mapping.
+
+    Public payload intentionally excludes candidate labels and real file paths.
+    """
+    rng = random.Random(seed + 7919)
+    used_tokens: set[str] = set()
+
+    # Build anonymized video tokens for each concrete media file.
+    file_to_video_token: dict[str, str] = {}
+    video_token_to_private: dict[str, dict] = {}
+    for case in cases:
+        for cand in (case.a, case.b):
+            if cand.file_rel in file_to_video_token:
+                continue
+            token = generate_token("v", rng, used_tokens)
+            file_to_video_token[cand.file_rel] = token
+            video_token_to_private[token] = {
+                "file": cand.file_rel,
+                "id": cand.video_obj_id,
+                "option": cand.option,
+            }
+
+    # Build anonymized case tokens.
+    case_id_to_token: dict[str, str] = {}
+    case_token_to_private: dict[str, dict] = {}
+    for case in cases:
+        case_token = generate_token("c", rng, used_tokens)
+        case_id_to_token[case.case_id] = case_token
+        case_token_to_private[case_token] = {
+            "case_id": case.case_id,
+            "video_id": case.video_id,
+            "a_option": case.a.option,
+            "b_option": case.b.option,
+            "a_file": case.a.file_rel,
+            "b_file": case.b.file_rel,
+        }
+
+    public_users: dict[str, list[dict]] = {}
+    for user_id, questions in payload["users"].items():
+        out_questions: list[dict] = []
+        for q in questions:
+            out_questions.append(
+                {
+                    "question_no": q["question_no"],
+                    "video_id": q["video_id"],
+                    "case_token": case_id_to_token[q["case_id"]],
+                    "pair": [
+                        {"file": file_to_video_token[q["pair"][0]["file"]]},
+                        {"file": file_to_video_token[q["pair"][1]["file"]]},
+                    ],
+                }
+            )
+        public_users[user_id] = out_questions
+
+    internal_summary = payload["summary"]
+    source_counts = internal_summary.get("source_counts", {})
+    public_source_counts = {
+        "balanced": int(source_counts.get("balanced", 0)),
+        "random_extra": int(source_counts.get("random_non_vidmuse", 0)),
+    }
+    case_counts = internal_summary.get("case_counts", {})
+    non_random_case_counts = internal_summary.get("non_random_case_counts", {})
+    case_token_counts = {
+        case_id_to_token[case_id]: count
+        for case_id, count in case_counts.items()
+        if case_id in case_id_to_token
+    }
+    non_random_case_token_counts = {
+        case_id_to_token[case_id]: count
+        for case_id, count in non_random_case_counts.items()
+        if case_id in case_id_to_token
+    }
+
+    public_summary = {
+        "generated_at_utc": internal_summary.get("generated_at_utc"),
+        "total_users": internal_summary.get("total_users"),
+        "questions_per_user": internal_summary.get("questions_per_user"),
+        "total_questions": internal_summary.get("total_questions"),
+        "total_cases": internal_summary.get("total_cases"),
+        "source_counts": public_source_counts,
+        "random_exclusion_valid": bool(internal_summary.get("random_non_vidmuse_valid", False)),
+        "per_video_candidate_counts": internal_summary.get("per_video_candidate_counts", {}),
+        "per_video_case_counts": internal_summary.get("per_video_case_counts", {}),
+        "per_video_question_counts": internal_summary.get("per_video_question_counts", {}),
+        "case_token_counts": dict(sorted(case_token_counts.items())),
+        "non_random_case_token_counts": dict(sorted(non_random_case_token_counts.items())),
+    }
+
+    base_meta = payload["meta"]
+    public_payload = {
+        "meta": {
+            "videos_dir": base_meta.get("videos_dir"),
+            "seed": base_meta.get("seed"),
+            "users": base_meta.get("users"),
+            "questions_per_user": base_meta.get("questions_per_user"),
+            "balanced_questions": base_meta.get("balanced_questions"),
+            "random_questions": base_meta.get("random_questions"),
+            "sanitized_for_participants": True,
+            "notes": "No candidate labels or real file paths are included.",
+        },
+        "summary": public_summary,
+        "users": public_users,
+    }
+    private_map = {
+        "meta": {
+            "generated_from_seed": seed,
+            "warning": "Sensitive mapping. Do not expose to participants.",
+        },
+        "video_token_to_private": dict(sorted(video_token_to_private.items())),
+        "case_token_to_private": dict(sorted(case_token_to_private.items())),
+    }
+    return public_payload, private_map
+
+
+def write_public_csv(public_payload: dict, output_csv: Path) -> None:
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
+    rows: list[dict] = []
+    for user_id, questions in public_payload["users"].items():
+        for q in questions:
+            rows.append(
+                {
+                    "user_id": user_id,
+                    "question_no": q["question_no"],
+                    "video_id": q["video_id"],
+                    "case_token": q["case_token"],
+                    "a_file_token": q["pair"][0]["file"],
+                    "b_file_token": q["pair"][1]["file"],
+                }
+            )
+    with output_csv.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "user_id",
+                "question_no",
+                "video_id",
+                "case_token",
+                "a_file_token",
+                "b_file_token",
+            ],
+        )
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate VTMR survey test-case assignments.")
     parser.add_argument("--videos-dir", type=Path, default=Path("videos"))
@@ -381,6 +539,21 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=20260305)
     parser.add_argument("--output-json", type=Path, default=Path("data/test_case_assignments.json"))
     parser.add_argument("--output-csv", type=Path, default=Path("data/test_case_assignments.csv"))
+    parser.add_argument(
+        "--output-public-json",
+        type=Path,
+        default=Path("data/test_case_assignments_public.json"),
+    )
+    parser.add_argument(
+        "--output-public-csv",
+        type=Path,
+        default=Path("data/test_case_assignments_public.csv"),
+    )
+    parser.add_argument(
+        "--output-private-map-json",
+        type=Path,
+        default=Path("data/test_case_assignments_private_map.json"),
+    )
     return parser.parse_args(argv)
 
 
@@ -416,12 +589,22 @@ def main(argv: Iterable[str] | None = None) -> int:
     args.output_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     write_csv(assignments, args.output_csv)
 
+    public_payload, private_map = build_public_payload(payload, cases, args.seed)
+    args.output_public_json.parent.mkdir(parents=True, exist_ok=True)
+    args.output_private_map_json.parent.mkdir(parents=True, exist_ok=True)
+    args.output_public_json.write_text(json.dumps(public_payload, indent=2), encoding="utf-8")
+    args.output_private_map_json.write_text(json.dumps(private_map, indent=2), encoding="utf-8")
+    write_public_csv(public_payload, args.output_public_csv)
+
     print(f"Generated {summary['total_questions']} questions for {summary['total_users']} users.")
     print(f"Total cases: {summary['total_cases']}")
     print(f"Source counts: {summary['source_counts']}")
     print(f"Random non-vidmuse valid: {summary['random_non_vidmuse_valid']}")
-    print(f"JSON: {args.output_json}")
-    print(f"CSV:  {args.output_csv}")
+    print(f"Internal JSON: {args.output_json}")
+    print(f"Internal CSV:  {args.output_csv}")
+    print(f"Public JSON:   {args.output_public_json}")
+    print(f"Public CSV:    {args.output_public_csv}")
+    print(f"Private map:   {args.output_private_map_json}")
     return 0
 
 

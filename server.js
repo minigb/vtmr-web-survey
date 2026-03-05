@@ -1,13 +1,15 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 5555;
 const VIDEOS_DIR = path.join(__dirname, 'videos');
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.webm', '.ogg']);
+const RESULTS_READ_TOKEN = process.env.RESULTS_READ_TOKEN || '';
+const ADMIN_API_TOKEN = process.env.ADMIN_API_TOKEN || '';
 
 app.use(express.static('public'));
-app.use('/videos', express.static('videos'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
@@ -47,7 +49,6 @@ function discoverVideoCatalog() {
       .filter((filename) => VIDEO_EXTENSIONS.has(path.extname(filename).toLowerCase()))
       .sort()
       .map((videoFile) => ({
-        id: `${subdir}_${path.parse(videoFile).name}`,
         file: `videos/${subdir}/${videoFile}`
       }));
 
@@ -57,6 +58,10 @@ function discoverVideoCatalog() {
       videos
     };
   });
+}
+
+function generateAnonVideoToken() {
+  return `v_${crypto.randomBytes(12).toString('hex')}`;
 }
 
 function createAnonymousMapping() {
@@ -73,17 +78,13 @@ function createAnonymousMapping() {
   });
 
   // Create shuffled anonymous IDs
-  const anonymousIds = [];
-  for (let i = 1; i <= allVideoFiles.length; i++) {
-    anonymousIds.push(`anon_video_${i.toString().padStart(3, '0')}`);
-  }
-
-  // Shuffle the anonymous IDs using Fisher-Yates algorithm
-  shuffleInPlace(anonymousIds);
-
-  // Map shuffled anonymous IDs to video files
-  allVideoFiles.forEach((videoFile, index) => {
-    const anonId = anonymousIds[index];
+  const used = new Set();
+  allVideoFiles.forEach((videoFile) => {
+    let anonId = generateAnonVideoToken();
+    while (used.has(anonId)) {
+      anonId = generateAnonVideoToken();
+    }
+    used.add(anonId);
     videoMapping.set(anonId, videoFile);
     reverseMapping.set(videoFile, anonId);
   });
@@ -106,6 +107,12 @@ function refreshMappings() {
 
 // API endpoint to refresh mappings
 app.post('/api/refresh-mappings', (req, res) => {
+  if (!ADMIN_API_TOKEN) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  if (req.query.token !== ADMIN_API_TOKEN) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   refreshMappings();
   res.json({ ok: true, message: 'Mappings refreshed' });
 });
@@ -128,10 +135,7 @@ app.get('/api/all-pairs', (req, res) => {
     }
 
     const sampledVideos = sampleTwoVideos(survey.videos);
-    const pair = sampledVideos.map((video) => ({
-      id: video.id,
-      file: reverseMapping.get(video.file)
-    }));
+    const pair = sampledVideos.map((video) => ({ file: reverseMapping.get(video.file) }));
 
     if (!pair[0].file || !pair[1].file) {
       return;
@@ -186,15 +190,23 @@ app.post('/api/submit', (req, res) => {
   }
 
   // Map anonymous video IDs back to original file paths for research data
-  const votesWithOriginalPaths = votes.map(vote => {
-    // Helper to map a video object back to original path
+  const votesWithOriginalPaths = votes.map((vote) => {
+    // Only trust anonymous token from client and resolve canonical server-side fields.
     const mapVideo = (video) => {
       if (!video || typeof video !== 'object') {
         return null;
       }
+      const anonFile = String(video.file || '');
+      const realFile = videoMapping.get(anonFile);
+      if (!realFile) {
+        return null;
+      }
+      const parsed = path.parse(realFile);
+      const subdir = path.basename(path.dirname(realFile));
+      const canonicalId = `${subdir}_${parsed.name}`;
       return {
-        ...video,
-        file: videoMapping.get(video.file) || video.file // Resolve anonymous ID to real path
+        id: canonicalId,
+        file: realFile
       };
     };
 
@@ -225,6 +237,31 @@ app.post('/api/submit', (req, res) => {
     };
   });
 
+  // Reject malformed or tampered payloads that contain unknown video tokens.
+  const hasInvalidVideoRef = votesWithOriginalPaths.some((vote) => {
+    if (!Array.isArray(vote.pair) || vote.pair.length !== 2 || vote.pair.some((video) => !video)) {
+      return true;
+    }
+    if (!vote.results || typeof vote.results !== 'object') {
+      return true;
+    }
+    for (const result of Object.values(vote.results)) {
+      if (!result || typeof result !== 'object') {
+        return true;
+      }
+      if (result.tie === true) {
+        continue;
+      }
+      if (!result.winner || !result.loser) {
+        return true;
+      }
+    }
+    return false;
+  });
+  if (hasInvalidVideoRef) {
+    return res.status(400).json({ ok: false, error: 'Invalid vote payload' });
+  }
+
   fs.readFile(resultsFile, 'utf8', (err, data) => {
     if (err) {
       console.error(err);
@@ -246,6 +283,12 @@ app.post('/api/submit', (req, res) => {
 });
 
 app.get('/results', (req, res) => {
+  if (!RESULTS_READ_TOKEN) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  if (req.query.token !== RESULTS_READ_TOKEN) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   res.sendFile(resultsFile);
 });
 

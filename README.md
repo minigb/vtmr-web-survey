@@ -47,6 +47,10 @@ Use the provided deployment script to build and run the application in a Docker 
 ./dev-deploy.sh
 ```
 
+Optional security env vars:
+- `RESULTS_READ_TOKEN`: enables `GET /results?token=...` (without it, `/results` is disabled).
+- `ADMIN_API_TOKEN`: enables `POST /api/refresh-mappings?token=...` (without it, endpoint is disabled).
+
 ### 4. Access the Survey
 
 Open your web browser and navigate to the application URL (e.g., `http://localhost:5555` or `http://your_server_ip:5555`).
@@ -58,6 +62,11 @@ This project uses a Docker-based development workflow. See `DEVELOPMENT.md` for 
 ## Data Analysis
 
 The survey results are stored in `data/results.json`. The file contains a single JSON object where each key is a participant's ID. Under each ID is a list of their final votes, submitted as a batch at the end of the survey.
+
+Assignment generator outputs:
+- `data/test_case_assignments_public.json` and `data/test_case_assignments_public.csv`: participant-safe (anonymous tokens only).
+- `data/test_case_assignments_private_map.json`: sensitive mapping from anonymous tokens to real files/options (do not expose).
+- `data/test_case_assignments.json` and `data/test_case_assignments.csv`: internal analysis versions with full labels.
 
 ```json
 {
