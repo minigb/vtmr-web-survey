@@ -154,50 +154,8 @@ def generate_assignments(
         )
 
     video_ids = list(by_video.keys())
-    random_chunks: dict[str, int] = {video_id: 0 for video_id in video_ids}
-    eligible_video_ids = [
-        video_id
-        for video_id in video_ids
-        if any(
-            case.a.option != random_exclude_option and case.b.option != random_exclude_option
-            for case in by_video[video_id]
-        )
-    ]
-    if random_questions > 0 and not eligible_video_ids:
-        raise ValueError(
-            f"No eligible videos for random sampling when excluding '{random_exclude_option}'."
-        )
-
-    # Allocate random questions in chunks equal to number of cases in each video so that
-    # (slots_per_video - random_chunks[video]) is divisible by case count.
-    remaining_random = random_questions
-    ordered_for_random = sorted(
-        eligible_video_ids,
-        key=lambda video_id: (len(by_video[video_id]), video_id),
-    )
-    while remaining_random > 0:
-        progressed = False
-        for video_id in ordered_for_random:
-            chunk = len(by_video[video_id])
-            if chunk > remaining_random:
-                continue
-            # Keep at least 1 non-random sample per case.
-            if random_chunks[video_id] + chunk > (slots_per_video - chunk):
-                continue
-            random_chunks[video_id] += chunk
-            remaining_random -= chunk
-            progressed = True
-            if remaining_random == 0:
-                break
-        if not progressed:
-            raise ValueError(
-                "Could not allocate random questions while preserving per-video uniform non-random counts. "
-                f"remaining_random={remaining_random}"
-            )
-
     assignments: dict[str, list[dict]] = {user_id: [] for user_id in user_ids}
     case_lookup = {case.case_id: case for case in cases}
-    random_needed_per_case: Counter[str] = Counter()
     occurrences_per_case: defaultdict[str, list[dict]] = defaultdict(list)
 
     def _pair_case_tokens(case_counts: dict[str, int]) -> list[tuple[str, str]]:
@@ -234,31 +192,13 @@ def generate_assignments(
     for video_id in video_ids:
         video_cases = by_video[video_id]
         case_count = len(video_cases)
-        random_for_video = random_chunks[video_id]
-        non_random_total = slots_per_video - random_for_video
-        if non_random_total % case_count != 0:
-            raise ValueError(
-                f"Non-random total {non_random_total} for {video_id} not divisible by case count {case_count}"
-            )
-        non_random_per_case = non_random_total // case_count
-
-        case_total_counts: dict[str, int] = {case.case_id: non_random_per_case for case in video_cases}
-
-        eligible_case_ids = [
-            case.case_id
-            for case in video_cases
-            if case.a.option != random_exclude_option and case.b.option != random_exclude_option
-        ]
-        if random_for_video > 0 and not eligible_case_ids:
-            raise ValueError(f"No eligible random cases in video {video_id}")
-
-        # Spread random assignments across eligible cases in shuffled round-robin.
-        rr = eligible_case_ids[:]
-        rng.shuffle(rr)
-        for i in range(random_for_video):
-            target_case = rr[i % len(rr)]
-            case_total_counts[target_case] += 1
-            random_needed_per_case[target_case] += 1
+        base_per_case = slots_per_video // case_count
+        remainder = slots_per_video % case_count
+        case_total_counts: dict[str, int] = {case.case_id: base_per_case for case in video_cases}
+        if remainder > 0:
+            # Small random remainder distribution for general datasets where division is not exact.
+            for case_id in rng.sample([case.case_id for case in video_cases], remainder):
+                case_total_counts[case_id] += 1
 
         case_pairs = _pair_case_tokens(case_total_counts)
         rng.shuffle(case_pairs)
@@ -268,7 +208,43 @@ def generate_assignments(
                 occurrences_per_case[case_id].append(q)
                 assignments[user_id].append(q)
 
-    # Mark random questions per case (random draws come from eligible non-vidmuse case IDs only).
+    # Mark random questions per case.
+    # Pure random sampling rule:
+    #   - draw random_questions case IDs uniformly from all eligible non-vidmuse cases
+    #   - allow repeats (multinomial sampling), then mark that many occurrences as random
+    eligible_case_ids = [
+        case.case_id
+        for case in cases
+        if case.a.option != random_exclude_option and case.b.option != random_exclude_option
+    ]
+    if random_questions > 0 and not eligible_case_ids:
+        raise ValueError(
+            f"No eligible cases for random sampling when excluding '{random_exclude_option}'."
+        )
+
+    capacity = {case_id: len(occurrences_per_case[case_id]) for case_id in eligible_case_ids}
+    random_needed_per_case: Counter[str] = Counter()
+    if random_questions > 0:
+        # Retry if a very unlikely overflow appears (asked count exceeds available occurrences).
+        max_attempts = 2000
+        for _ in range(max_attempts):
+            draws = [rng.choice(eligible_case_ids) for _ in range(random_questions)]
+            candidate = Counter(draws)
+            if all(candidate[case_id] <= capacity.get(case_id, 0) for case_id in candidate):
+                random_needed_per_case = candidate
+                break
+        else:
+            # Guaranteed fallback: sample without replacement from a flattened occurrence-capacity pool.
+            weighted_pool: list[str] = []
+            for case_id in eligible_case_ids:
+                weighted_pool.extend([case_id] * capacity.get(case_id, 0))
+            if len(weighted_pool) < random_questions:
+                raise ValueError(
+                    f"Not enough eligible occurrences for random sampling: "
+                    f"need {random_questions}, have {len(weighted_pool)}"
+                )
+            random_needed_per_case = Counter(rng.sample(weighted_pool, random_questions))
+
     for case_id, random_needed in random_needed_per_case.items():
         if random_needed <= 0:
             continue
@@ -528,6 +504,112 @@ def write_public_csv(public_payload: dict, output_csv: Path) -> None:
         writer.writerows(rows)
 
 
+def validate_internal_assignments(payload: dict) -> tuple[list[tuple[str, bool, str]], Counter[str]]:
+    users = payload["users"]
+    summary = payload["summary"]
+
+    expected_users = int(payload["meta"]["users"])
+    expected_questions_per_user = int(payload["meta"]["questions_per_user"])
+    expected_random = int(payload["meta"]["random_questions"])
+
+    checks: list[tuple[str, bool, str]] = []
+
+    # Check 1: each user has 20 videos x 2 questions.
+    per_user_ok = True
+    first_issue = ""
+    for user_id, questions in users.items():
+        if len(questions) != expected_questions_per_user:
+            per_user_ok = False
+            first_issue = f"{user_id} has {len(questions)} questions"
+            break
+        by_video = Counter(q["video_id"] for q in questions)
+        if len(by_video) != expected_questions_per_user // 2:
+            per_user_ok = False
+            first_issue = f"{user_id} has {len(by_video)} unique videos"
+            break
+        if any(count != 2 for count in by_video.values()):
+            bad_video = next(video_id for video_id, count in by_video.items() if count != 2)
+            per_user_ok = False
+            first_issue = f"{user_id} video {bad_video} appears {by_video[bad_video]} times"
+            break
+    checks.append(
+        (
+            "Per-user 20 videos x 2 questions",
+            per_user_ok and len(users) == expected_users,
+            first_issue or f"{len(users)} users checked",
+        )
+    )
+
+    # Check 2: total combinations are uniform within each video.
+    by_video_counts: dict[str, Counter[str]] = {}
+    for questions in users.values():
+        for q in questions:
+            video_id = q["video_id"]
+            by_video_counts.setdefault(video_id, Counter())
+            by_video_counts[video_id][q["case_id"]] += 1
+    uniform_ok = True
+    uniform_issue = ""
+    for video_id, counts in sorted(by_video_counts.items()):
+        values = set(counts.values())
+        if len(values) != 1:
+            uniform_ok = False
+            uniform_issue = f"{video_id} non-random counts={sorted(values)}"
+            break
+    checks.append(
+        (
+            "Total combination uniformity within each video",
+            uniform_ok,
+            uniform_issue or f"{len(by_video_counts)} videos checked",
+        )
+    )
+
+    # Check 3: random count and exclusion validity.
+    random_case_counts = Counter(
+        q["case_id"]
+        for questions in users.values()
+        for q in questions
+        if q["source"] == "random_non_vidmuse"
+    )
+    random_count = sum(random_case_counts.values())
+    random_ok = random_count == expected_random and bool(summary.get("random_non_vidmuse_valid", False))
+    random_msg = (
+        f"random_count={random_count}, exclusion_valid={summary.get('random_non_vidmuse_valid', False)}"
+    )
+    checks.append(("Random sample count/exclusion", random_ok, random_msg))
+
+    return checks, random_case_counts
+
+
+def random_distribution_from_public_summary(public_payload: dict) -> Counter[str]:
+    summary = public_payload.get("summary", {})
+    total_counts = summary.get("case_token_counts", {})
+    non_random_counts = summary.get("non_random_case_token_counts", {})
+    out: Counter[str] = Counter()
+    for token, total in total_counts.items():
+        diff = int(total) - int(non_random_counts.get(token, 0))
+        if diff > 0:
+            out[token] = diff
+    return out
+
+
+def print_validation_report(payload: dict, public_payload: dict) -> None:
+    checks, random_case_counts = validate_internal_assignments(payload)
+
+    print("\nValidation report:")
+    for name, ok, msg in checks:
+        status = "PASS" if ok else "FAIL"
+        print(f"- [{status}] {name} ({msg})")
+
+    print("\nRandom 30-sample distribution (internal case_id):")
+    for case_id, count in sorted(random_case_counts.items(), key=lambda item: (-item[1], item[0])):
+        print(f"  {case_id}: {count}")
+
+    random_token_counts = random_distribution_from_public_summary(public_payload)
+    print("\nRandom 30-sample distribution (public case_token):")
+    for token, count in sorted(random_token_counts.items(), key=lambda item: (-item[1], item[0])):
+        print(f"  {token}: {count}")
+
+
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate VTMR survey test-case assignments.")
     parser.add_argument("--videos-dir", type=Path, default=Path("videos"))
@@ -605,6 +687,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     print(f"Public JSON:   {args.output_public_json}")
     print(f"Public CSV:    {args.output_public_csv}")
     print(f"Private map:   {args.output_private_map_json}")
+    print_validation_report(payload, public_payload)
     return 0
 
 
