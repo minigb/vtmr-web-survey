@@ -1,6 +1,6 @@
 # Survey data
 data/
-videos/
+videos*/
 
 # Analysis results
 *.csv
