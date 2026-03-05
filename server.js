@@ -139,7 +139,7 @@ function allocateUserSlot(username) {
 
   const existing = mappings.byUsername[key];
   if (existing && existing.userId) {
-    return { userId: existing.userId, mappings, username: normalized, created: false };
+    return { error: 'This username is already taken. Please use a different username.', status: 409 };
   }
 
   const availableUserId = assignmentUserIds.find((userId) => !mappings.byUserId[userId]);
