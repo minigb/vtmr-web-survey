@@ -188,19 +188,33 @@ app.post('/api/submit', (req, res) => {
   // Map anonymous video IDs back to original file paths for research data
   const votesWithOriginalPaths = votes.map(vote => {
     // Helper to map a video object back to original path
-    const mapVideo = (video) => ({
-      ...video,
-      file: videoMapping.get(video.file) || video.file // Resolve anonymous ID to real path
-    });
+    const mapVideo = (video) => {
+      if (!video || typeof video !== 'object') {
+        return null;
+      }
+      return {
+        ...video,
+        file: videoMapping.get(video.file) || video.file // Resolve anonymous ID to real path
+      };
+    };
 
     const mappedResults = {};
     // Map winners and losers for each metric
     if (vote.results) {
       for (const [metric, result] of Object.entries(vote.results)) {
-        mappedResults[metric] = {
-          winner: mapVideo(result.winner),
-          loser: mapVideo(result.loser)
-        };
+        if (result && result.tie) {
+          mappedResults[metric] = {
+            tie: true,
+            winner: null,
+            loser: null
+          };
+        } else {
+          mappedResults[metric] = {
+            tie: false,
+            winner: mapVideo(result?.winner),
+            loser: mapVideo(result?.loser)
+          };
+        }
       }
     }
 

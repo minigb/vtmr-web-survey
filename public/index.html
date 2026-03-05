@@ -42,16 +42,13 @@
         <p>1) <strong>Global Alignment:</strong> Which background music better matches the overall content and mood of the video?</p>
         <button class="choice-btn q1-btn" data-q="global" data-choice="A">A</button>
         <button class="choice-btn q1-btn" data-q="global" data-choice="B">B</button>
+        <button class="choice-btn q1-btn" data-q="global" data-choice="TIE">Tie</button>
       </div>
       <div class="question-block">
-        <p>2) <strong>Temporal Alignment:</strong> Which background music is better temporally aligned with the video’s pacing and visual changes?</p>
-        <button class="choice-btn q2-btn" data-q="temporal" data-choice="A">A</button>
-        <button class="choice-btn q2-btn" data-q="temporal" data-choice="B">B</button>
-      </div>
-      <div class="question-block">
-        <p>3) <strong>Music Audio Quality:</strong> Which music has better audio quality as a standalone track?</p>
-        <button class="choice-btn q3-btn" data-q="quality" data-choice="A">A</button>
-        <button class="choice-btn q3-btn" data-q="quality" data-choice="B">B</button>
+        <p>2) <strong>Music Audio Quality:</strong> Which music has better audio quality as a standalone track?</p>
+        <button class="choice-btn q2-btn" data-q="quality" data-choice="A">A</button>
+        <button class="choice-btn q2-btn" data-q="quality" data-choice="B">B</button>
+        <button class="choice-btn q2-btn" data-q="quality" data-choice="TIE">Tie</button>
       </div>
     </div>
     <div id="navigation-container" style="margin-top: 20px;">
@@ -81,8 +78,6 @@
     const surveyContainer = document.getElementById('survey-container');
     const videoA = document.getElementById('video-a');
     const videoB = document.getElementById('video-b');
-    const voteA_btn = document.getElementById('vote-a');
-    const voteB_btn = document.getElementById('vote-b');
     const previousPairBtn = document.getElementById('previous-pair');
     const nextPairBtn = document.getElementById('next-pair');
     const submitSurveyBtn = document.getElementById('submit-survey');
@@ -132,17 +127,14 @@
       if (currentChoices.global) {
         document.querySelector(`.q1-btn[data-choice="${currentChoices.global}"]`).classList.add('selected');
       }
-      if (currentChoices.temporal) {
-        document.querySelector(`.q2-btn[data-choice="${currentChoices.temporal}"]`).classList.add('selected');
-      }
       if (currentChoices.quality) {
-        document.querySelector(`.q3-btn[data-choice="${currentChoices.quality}"]`).classList.add('selected');
+        document.querySelector(`.q2-btn[data-choice="${currentChoices.quality}"]`).classList.add('selected');
       }
     }
 
     function isPairAnswered(index) {
       const choice = userChoices[index];
-      return !!(choice && choice.global && choice.temporal && choice.quality);
+      return !!(choice && choice.global && choice.quality);
     }
 
     function updateNavigationState() {
@@ -175,14 +167,33 @@
       updateNavigationState();
     }
 
+    function buildMetricResult(choice, pair) {
+      if (choice === 'A') {
+        return {
+          tie: false,
+          winner: pair[0],
+          loser: pair[1]
+        };
+      }
+      if (choice === 'B') {
+        return {
+          tie: false,
+          winner: pair[1],
+          loser: pair[0]
+        };
+      }
+      return {
+        tie: true,
+        winner: null,
+        loser: null
+      };
+    }
+
     // Add event listeners for all choice buttons
     document.querySelectorAll('.q1-btn').forEach(btn => {
       btn.addEventListener('click', () => recordChoice('global', btn.dataset.choice));
     });
     document.querySelectorAll('.q2-btn').forEach(btn => {
-      btn.addEventListener('click', () => recordChoice('temporal', btn.dataset.choice));
-    });
-    document.querySelectorAll('.q3-btn').forEach(btn => {
       btn.addEventListener('click', () => recordChoice('quality', btn.dataset.choice));
     });
 
@@ -195,7 +206,7 @@
 
     nextPairBtn.addEventListener('click', () => {
       if (!isPairAnswered(currentPairIndex)) {
-        alert('Please answer all 3 questions before moving to the next pair.');
+        alert('Please answer both questions before moving to the next pair.');
         return;
       }
 
@@ -208,11 +219,11 @@
     submitSurveyBtn.addEventListener('click', async () => {
       // Validate that all questions are answered for all pairs
       const allAnswered = userChoices.every(choice => 
-        choice && choice.global && choice.temporal && choice.quality
+        choice && choice.global && choice.quality
       );
 
       if (!allAnswered || userChoices.length < allPairs.length) {
-        alert('Please answer all 3 questions for every video pair before submitting.');
+        alert('Please answer both questions for every video pair before submitting.');
         return;
       }
 
@@ -221,20 +232,10 @@
         return {
           pair,
           choices: choices,
-          // Store winners/losers for each metric
+          // Store winners/losers for each metric. Ties have no winner/loser.
           results: {
-            global: {
-              winner: choices.global === 'A' ? pair[0] : pair[1],
-              loser: choices.global === 'A' ? pair[1] : pair[0]
-            },
-            temporal: {
-              winner: choices.temporal === 'A' ? pair[0] : pair[1],
-              loser: choices.temporal === 'A' ? pair[1] : pair[0]
-            },
-            quality: {
-              winner: choices.quality === 'A' ? pair[0] : pair[1],
-              loser: choices.quality === 'A' ? pair[1] : pair[0]
-            }
+            global: buildMetricResult(choices.global, pair),
+            quality: buildMetricResult(choices.quality, pair)
           },
           ts: new Date().toISOString()
         };
