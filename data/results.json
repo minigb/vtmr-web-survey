@@ -1,0 +1,800 @@
+{
+  "admin": [
+    {
+      "pair": [
+        {
+          "id": "TheSoundOfMagic_s01e03_46_vidmuse_remix",
+          "file": "videos/TheSoundOfMagic_s01e03_46/vidmuse_remix.mp4"
+        },
+        {
+          "id": "TheSoundOfMagic_s01e03_46_vtmr_remix",
+          "file": "videos/TheSoundOfMagic_s01e03_46/vtmr_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "B",
+        "quality": "B"
+      },
+      "results": {
+        "global": {
+          "tie": false,
+          "winner": {
+            "id": "TheSoundOfMagic_s01e03_46_vtmr_remix",
+            "file": "videos/TheSoundOfMagic_s01e03_46/vtmr_remix.mp4"
+          },
+          "loser": {
+            "id": "TheSoundOfMagic_s01e03_46_vidmuse_remix",
+            "file": "videos/TheSoundOfMagic_s01e03_46/vidmuse_remix.mp4"
+          }
+        },
+        "quality": {
+          "tie": false,
+          "winner": {
+            "id": "TheSoundOfMagic_s01e03_46_vtmr_remix",
+            "file": "videos/TheSoundOfMagic_s01e03_46/vtmr_remix.mp4"
+          },
+          "loser": {
+            "id": "TheSoundOfMagic_s01e03_46_vidmuse_remix",
+            "file": "videos/TheSoundOfMagic_s01e03_46/vidmuse_remix.mp4"
+          }
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "8nCJf1m3QoY_vtmr_remix",
+          "file": "videos/8nCJf1m3QoY/vtmr_remix.mp4"
+        },
+        {
+          "id": "8nCJf1m3QoY_vidmuse_remix",
+          "file": "videos/8nCJf1m3QoY/vidmuse_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "B",
+        "quality": "A"
+      },
+      "results": {
+        "global": {
+          "tie": false,
+          "winner": {
+            "id": "8nCJf1m3QoY_vidmuse_remix",
+            "file": "videos/8nCJf1m3QoY/vidmuse_remix.mp4"
+          },
+          "loser": {
+            "id": "8nCJf1m3QoY_vtmr_remix",
+            "file": "videos/8nCJf1m3QoY/vtmr_remix.mp4"
+          }
+        },
+        "quality": {
+          "tie": false,
+          "winner": {
+            "id": "8nCJf1m3QoY_vtmr_remix",
+            "file": "videos/8nCJf1m3QoY/vtmr_remix.mp4"
+          },
+          "loser": {
+            "id": "8nCJf1m3QoY_vidmuse_remix",
+            "file": "videos/8nCJf1m3QoY/vidmuse_remix.mp4"
+          }
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "UDHg-Wq1Hcs_vidmuse_remix",
+          "file": "videos/UDHg-Wq1Hcs/vidmuse_remix.mp4"
+        },
+        {
+          "id": "UDHg-Wq1Hcs_vtmr_remix",
+          "file": "videos/UDHg-Wq1Hcs/vtmr_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "B",
+        "quality": "B"
+      },
+      "results": {
+        "global": {
+          "tie": false,
+          "winner": {
+            "id": "UDHg-Wq1Hcs_vtmr_remix",
+            "file": "videos/UDHg-Wq1Hcs/vtmr_remix.mp4"
+          },
+          "loser": {
+            "id": "UDHg-Wq1Hcs_vidmuse_remix",
+            "file": "videos/UDHg-Wq1Hcs/vidmuse_remix.mp4"
+          }
+        },
+        "quality": {
+          "tie": false,
+          "winner": {
+            "id": "UDHg-Wq1Hcs_vtmr_remix",
+            "file": "videos/UDHg-Wq1Hcs/vtmr_remix.mp4"
+          },
+          "loser": {
+            "id": "UDHg-Wq1Hcs_vidmuse_remix",
+            "file": "videos/UDHg-Wq1Hcs/vidmuse_remix.mp4"
+          }
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "7Ab6vkPoMXE_vtmr_remix",
+          "file": "videos/7Ab6vkPoMXE/vtmr_remix.mp4"
+        },
+        {
+          "id": "7Ab6vkPoMXE_firefly_remix",
+          "file": "videos/7Ab6vkPoMXE/firefly_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "TIE",
+        "quality": "TIE"
+      },
+      "results": {
+        "global": {
+          "tie": true,
+          "winner": null,
+          "loser": null
+        },
+        "quality": {
+          "tie": true,
+          "winner": null,
+          "loser": null
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "LCcoLHfrN0g_vidmuse_remix",
+          "file": "videos/LCcoLHfrN0g/vidmuse_remix.mp4"
+        },
+        {
+          "id": "LCcoLHfrN0g_firefly_remix",
+          "file": "videos/LCcoLHfrN0g/firefly_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "TIE",
+        "quality": "B"
+      },
+      "results": {
+        "global": {
+          "tie": true,
+          "winner": null,
+          "loser": null
+        },
+        "quality": {
+          "tie": false,
+          "winner": {
+            "id": "LCcoLHfrN0g_firefly_remix",
+            "file": "videos/LCcoLHfrN0g/firefly_remix.mp4"
+          },
+          "loser": {
+            "id": "LCcoLHfrN0g_vidmuse_remix",
+            "file": "videos/LCcoLHfrN0g/vidmuse_remix.mp4"
+          }
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "pSkboLYWdzY_firefly_remix",
+          "file": "videos/pSkboLYWdzY/firefly_remix.mp4"
+        },
+        {
+          "id": "pSkboLYWdzY_vidmuse_remix",
+          "file": "videos/pSkboLYWdzY/vidmuse_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "A",
+        "quality": "A"
+      },
+      "results": {
+        "global": {
+          "tie": false,
+          "winner": {
+            "id": "pSkboLYWdzY_firefly_remix",
+            "file": "videos/pSkboLYWdzY/firefly_remix.mp4"
+          },
+          "loser": {
+            "id": "pSkboLYWdzY_vidmuse_remix",
+            "file": "videos/pSkboLYWdzY/vidmuse_remix.mp4"
+          }
+        },
+        "quality": {
+          "tie": false,
+          "winner": {
+            "id": "pSkboLYWdzY_firefly_remix",
+            "file": "videos/pSkboLYWdzY/firefly_remix.mp4"
+          },
+          "loser": {
+            "id": "pSkboLYWdzY_vidmuse_remix",
+            "file": "videos/pSkboLYWdzY/vidmuse_remix.mp4"
+          }
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "DearJinli_lp_6_vtmr_remix",
+          "file": "videos/DearJinli_lp_6/vtmr_remix.mp4"
+        },
+        {
+          "id": "DearJinli_lp_6_vidmuse_remix",
+          "file": "videos/DearJinli_lp_6/vidmuse_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "A",
+        "quality": "A"
+      },
+      "results": {
+        "global": {
+          "tie": false,
+          "winner": {
+            "id": "DearJinli_lp_6_vtmr_remix",
+            "file": "videos/DearJinli_lp_6/vtmr_remix.mp4"
+          },
+          "loser": {
+            "id": "DearJinli_lp_6_vidmuse_remix",
+            "file": "videos/DearJinli_lp_6/vidmuse_remix.mp4"
+          }
+        },
+        "quality": {
+          "tie": false,
+          "winner": {
+            "id": "DearJinli_lp_6_vtmr_remix",
+            "file": "videos/DearJinli_lp_6/vtmr_remix.mp4"
+          },
+          "loser": {
+            "id": "DearJinli_lp_6_vidmuse_remix",
+            "file": "videos/DearJinli_lp_6/vidmuse_remix.mp4"
+          }
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "MyLiberationNotes_s01e05_16_reference_remix",
+          "file": "videos/MyLiberationNotes_s01e05_16/reference_remix.mp4"
+        },
+        {
+          "id": "MyLiberationNotes_s01e05_16_vidmuse_remix",
+          "file": "videos/MyLiberationNotes_s01e05_16/vidmuse_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "A",
+        "quality": "A"
+      },
+      "results": {
+        "global": {
+          "tie": false,
+          "winner": {
+            "id": "MyLiberationNotes_s01e05_16_reference_remix",
+            "file": "videos/MyLiberationNotes_s01e05_16/reference_remix.mp4"
+          },
+          "loser": {
+            "id": "MyLiberationNotes_s01e05_16_vidmuse_remix",
+            "file": "videos/MyLiberationNotes_s01e05_16/vidmuse_remix.mp4"
+          }
+        },
+        "quality": {
+          "tie": false,
+          "winner": {
+            "id": "MyLiberationNotes_s01e05_16_reference_remix",
+            "file": "videos/MyLiberationNotes_s01e05_16/reference_remix.mp4"
+          },
+          "loser": {
+            "id": "MyLiberationNotes_s01e05_16_vidmuse_remix",
+            "file": "videos/MyLiberationNotes_s01e05_16/vidmuse_remix.mp4"
+          }
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "Running_man_704_48_vidmuse_remix",
+          "file": "videos/Running_man_704_48/vidmuse_remix.mp4"
+        },
+        {
+          "id": "Running_man_704_48_vtmr_remix",
+          "file": "videos/Running_man_704_48/vtmr_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "B",
+        "quality": "B"
+      },
+      "results": {
+        "global": {
+          "tie": false,
+          "winner": {
+            "id": "Running_man_704_48_vtmr_remix",
+            "file": "videos/Running_man_704_48/vtmr_remix.mp4"
+          },
+          "loser": {
+            "id": "Running_man_704_48_vidmuse_remix",
+            "file": "videos/Running_man_704_48/vidmuse_remix.mp4"
+          }
+        },
+        "quality": {
+          "tie": false,
+          "winner": {
+            "id": "Running_man_704_48_vtmr_remix",
+            "file": "videos/Running_man_704_48/vtmr_remix.mp4"
+          },
+          "loser": {
+            "id": "Running_man_704_48_vidmuse_remix",
+            "file": "videos/Running_man_704_48/vidmuse_remix.mp4"
+          }
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "aavUc1u--d8_vidmuse_remix",
+          "file": "videos/aavUc1u--d8/vidmuse_remix.mp4"
+        },
+        {
+          "id": "aavUc1u--d8_vtmr_remix",
+          "file": "videos/aavUc1u--d8/vtmr_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "B",
+        "quality": "B"
+      },
+      "results": {
+        "global": {
+          "tie": false,
+          "winner": {
+            "id": "aavUc1u--d8_vtmr_remix",
+            "file": "videos/aavUc1u--d8/vtmr_remix.mp4"
+          },
+          "loser": {
+            "id": "aavUc1u--d8_vidmuse_remix",
+            "file": "videos/aavUc1u--d8/vidmuse_remix.mp4"
+          }
+        },
+        "quality": {
+          "tie": false,
+          "winner": {
+            "id": "aavUc1u--d8_vtmr_remix",
+            "file": "videos/aavUc1u--d8/vtmr_remix.mp4"
+          },
+          "loser": {
+            "id": "aavUc1u--d8_vidmuse_remix",
+            "file": "videos/aavUc1u--d8/vidmuse_remix.mp4"
+          }
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "JaI34tlEfTM_firefly_remix",
+          "file": "videos/JaI34tlEfTM/firefly_remix.mp4"
+        },
+        {
+          "id": "JaI34tlEfTM_vtmr_remix",
+          "file": "videos/JaI34tlEfTM/vtmr_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "A",
+        "quality": "A"
+      },
+      "results": {
+        "global": {
+          "tie": false,
+          "winner": {
+            "id": "JaI34tlEfTM_firefly_remix",
+            "file": "videos/JaI34tlEfTM/firefly_remix.mp4"
+          },
+          "loser": {
+            "id": "JaI34tlEfTM_vtmr_remix",
+            "file": "videos/JaI34tlEfTM/vtmr_remix.mp4"
+          }
+        },
+        "quality": {
+          "tie": false,
+          "winner": {
+            "id": "JaI34tlEfTM_firefly_remix",
+            "file": "videos/JaI34tlEfTM/firefly_remix.mp4"
+          },
+          "loser": {
+            "id": "JaI34tlEfTM_vtmr_remix",
+            "file": "videos/JaI34tlEfTM/vtmr_remix.mp4"
+          }
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "MbUihXHHxsQ_vidmuse_remix",
+          "file": "videos/MbUihXHHxsQ/vidmuse_remix.mp4"
+        },
+        {
+          "id": "MbUihXHHxsQ_firefly_remix",
+          "file": "videos/MbUihXHHxsQ/firefly_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "B",
+        "quality": "B"
+      },
+      "results": {
+        "global": {
+          "tie": false,
+          "winner": {
+            "id": "MbUihXHHxsQ_firefly_remix",
+            "file": "videos/MbUihXHHxsQ/firefly_remix.mp4"
+          },
+          "loser": {
+            "id": "MbUihXHHxsQ_vidmuse_remix",
+            "file": "videos/MbUihXHHxsQ/vidmuse_remix.mp4"
+          }
+        },
+        "quality": {
+          "tie": false,
+          "winner": {
+            "id": "MbUihXHHxsQ_firefly_remix",
+            "file": "videos/MbUihXHHxsQ/firefly_remix.mp4"
+          },
+          "loser": {
+            "id": "MbUihXHHxsQ_vidmuse_remix",
+            "file": "videos/MbUihXHHxsQ/vidmuse_remix.mp4"
+          }
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "SweetHome_s01e10_16_firefly_remix",
+          "file": "videos/SweetHome_s01e10_16/firefly_remix.mp4"
+        },
+        {
+          "id": "SweetHome_s01e10_16_vidmuse_remix",
+          "file": "videos/SweetHome_s01e10_16/vidmuse_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "B",
+        "quality": "A"
+      },
+      "results": {
+        "global": {
+          "tie": false,
+          "winner": {
+            "id": "SweetHome_s01e10_16_vidmuse_remix",
+            "file": "videos/SweetHome_s01e10_16/vidmuse_remix.mp4"
+          },
+          "loser": {
+            "id": "SweetHome_s01e10_16_firefly_remix",
+            "file": "videos/SweetHome_s01e10_16/firefly_remix.mp4"
+          }
+        },
+        "quality": {
+          "tie": false,
+          "winner": {
+            "id": "SweetHome_s01e10_16_firefly_remix",
+            "file": "videos/SweetHome_s01e10_16/firefly_remix.mp4"
+          },
+          "loser": {
+            "id": "SweetHome_s01e10_16_vidmuse_remix",
+            "file": "videos/SweetHome_s01e10_16/vidmuse_remix.mp4"
+          }
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "OxIiXKG8qcs_firefly_remix",
+          "file": "videos/OxIiXKG8qcs/firefly_remix.mp4"
+        },
+        {
+          "id": "OxIiXKG8qcs_vidmuse_remix",
+          "file": "videos/OxIiXKG8qcs/vidmuse_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "A",
+        "quality": "B"
+      },
+      "results": {
+        "global": {
+          "tie": false,
+          "winner": {
+            "id": "OxIiXKG8qcs_firefly_remix",
+            "file": "videos/OxIiXKG8qcs/firefly_remix.mp4"
+          },
+          "loser": {
+            "id": "OxIiXKG8qcs_vidmuse_remix",
+            "file": "videos/OxIiXKG8qcs/vidmuse_remix.mp4"
+          }
+        },
+        "quality": {
+          "tie": false,
+          "winner": {
+            "id": "OxIiXKG8qcs_vidmuse_remix",
+            "file": "videos/OxIiXKG8qcs/vidmuse_remix.mp4"
+          },
+          "loser": {
+            "id": "OxIiXKG8qcs_firefly_remix",
+            "file": "videos/OxIiXKG8qcs/firefly_remix.mp4"
+          }
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "MyHoloLove_s01e01_47_reference_remix",
+          "file": "videos/MyHoloLove_s01e01_47/reference_remix.mp4"
+        },
+        {
+          "id": "MyHoloLove_s01e01_47_firefly_remix",
+          "file": "videos/MyHoloLove_s01e01_47/firefly_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "B",
+        "quality": "TIE"
+      },
+      "results": {
+        "global": {
+          "tie": false,
+          "winner": {
+            "id": "MyHoloLove_s01e01_47_firefly_remix",
+            "file": "videos/MyHoloLove_s01e01_47/firefly_remix.mp4"
+          },
+          "loser": {
+            "id": "MyHoloLove_s01e01_47_reference_remix",
+            "file": "videos/MyHoloLove_s01e01_47/reference_remix.mp4"
+          }
+        },
+        "quality": {
+          "tie": true,
+          "winner": null,
+          "loser": null
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "Extracurricular_s01e03_21_vidmuse_remix",
+          "file": "videos/Extracurricular_s01e03_21/vidmuse_remix.mp4"
+        },
+        {
+          "id": "Extracurricular_s01e03_21_firefly_remix",
+          "file": "videos/Extracurricular_s01e03_21/firefly_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "B",
+        "quality": "B"
+      },
+      "results": {
+        "global": {
+          "tie": false,
+          "winner": {
+            "id": "Extracurricular_s01e03_21_firefly_remix",
+            "file": "videos/Extracurricular_s01e03_21/firefly_remix.mp4"
+          },
+          "loser": {
+            "id": "Extracurricular_s01e03_21_vidmuse_remix",
+            "file": "videos/Extracurricular_s01e03_21/vidmuse_remix.mp4"
+          }
+        },
+        "quality": {
+          "tie": false,
+          "winner": {
+            "id": "Extracurricular_s01e03_21_firefly_remix",
+            "file": "videos/Extracurricular_s01e03_21/firefly_remix.mp4"
+          },
+          "loser": {
+            "id": "Extracurricular_s01e03_21_vidmuse_remix",
+            "file": "videos/Extracurricular_s01e03_21/vidmuse_remix.mp4"
+          }
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "TheKillersShoppingLists_s01e01_74_vidmuse_remix",
+          "file": "videos/TheKillersShoppingLists_s01e01_74/vidmuse_remix.mp4"
+        },
+        {
+          "id": "TheKillersShoppingLists_s01e01_74_firefly_remix",
+          "file": "videos/TheKillersShoppingLists_s01e01_74/firefly_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "B",
+        "quality": "B"
+      },
+      "results": {
+        "global": {
+          "tie": false,
+          "winner": {
+            "id": "TheKillersShoppingLists_s01e01_74_firefly_remix",
+            "file": "videos/TheKillersShoppingLists_s01e01_74/firefly_remix.mp4"
+          },
+          "loser": {
+            "id": "TheKillersShoppingLists_s01e01_74_vidmuse_remix",
+            "file": "videos/TheKillersShoppingLists_s01e01_74/vidmuse_remix.mp4"
+          }
+        },
+        "quality": {
+          "tie": false,
+          "winner": {
+            "id": "TheKillersShoppingLists_s01e01_74_firefly_remix",
+            "file": "videos/TheKillersShoppingLists_s01e01_74/firefly_remix.mp4"
+          },
+          "loser": {
+            "id": "TheKillersShoppingLists_s01e01_74_vidmuse_remix",
+            "file": "videos/TheKillersShoppingLists_s01e01_74/vidmuse_remix.mp4"
+          }
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "BehindYourTouch_s01_e01_11_vidmuse_remix",
+          "file": "videos/BehindYourTouch_s01_e01_11/vidmuse_remix.mp4"
+        },
+        {
+          "id": "BehindYourTouch_s01_e01_11_reference_remix",
+          "file": "videos/BehindYourTouch_s01_e01_11/reference_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "B",
+        "quality": "B"
+      },
+      "results": {
+        "global": {
+          "tie": false,
+          "winner": {
+            "id": "BehindYourTouch_s01_e01_11_reference_remix",
+            "file": "videos/BehindYourTouch_s01_e01_11/reference_remix.mp4"
+          },
+          "loser": {
+            "id": "BehindYourTouch_s01_e01_11_vidmuse_remix",
+            "file": "videos/BehindYourTouch_s01_e01_11/vidmuse_remix.mp4"
+          }
+        },
+        "quality": {
+          "tie": false,
+          "winner": {
+            "id": "BehindYourTouch_s01_e01_11_reference_remix",
+            "file": "videos/BehindYourTouch_s01_e01_11/reference_remix.mp4"
+          },
+          "loser": {
+            "id": "BehindYourTouch_s01_e01_11_vidmuse_remix",
+            "file": "videos/BehindYourTouch_s01_e01_11/vidmuse_remix.mp4"
+          }
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "WarriorsOfTheDawn_r04_7_vidmuse_remix",
+          "file": "videos/WarriorsOfTheDawn_r04_7/vidmuse_remix.mp4"
+        },
+        {
+          "id": "WarriorsOfTheDawn_r04_7_reference_remix",
+          "file": "videos/WarriorsOfTheDawn_r04_7/reference_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "B",
+        "quality": "B"
+      },
+      "results": {
+        "global": {
+          "tie": false,
+          "winner": {
+            "id": "WarriorsOfTheDawn_r04_7_reference_remix",
+            "file": "videos/WarriorsOfTheDawn_r04_7/reference_remix.mp4"
+          },
+          "loser": {
+            "id": "WarriorsOfTheDawn_r04_7_vidmuse_remix",
+            "file": "videos/WarriorsOfTheDawn_r04_7/vidmuse_remix.mp4"
+          }
+        },
+        "quality": {
+          "tie": false,
+          "winner": {
+            "id": "WarriorsOfTheDawn_r04_7_reference_remix",
+            "file": "videos/WarriorsOfTheDawn_r04_7/reference_remix.mp4"
+          },
+          "loser": {
+            "id": "WarriorsOfTheDawn_r04_7_vidmuse_remix",
+            "file": "videos/WarriorsOfTheDawn_r04_7/vidmuse_remix.mp4"
+          }
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    },
+    {
+      "pair": [
+        {
+          "id": "pyBwP7Pclyw_firefly_remix",
+          "file": "videos/pyBwP7Pclyw/firefly_remix.mp4"
+        },
+        {
+          "id": "pyBwP7Pclyw_vidmuse_remix",
+          "file": "videos/pyBwP7Pclyw/vidmuse_remix.mp4"
+        }
+      ],
+      "choices": {
+        "global": "A",
+        "quality": "A"
+      },
+      "results": {
+        "global": {
+          "tie": false,
+          "winner": {
+            "id": "pyBwP7Pclyw_firefly_remix",
+            "file": "videos/pyBwP7Pclyw/firefly_remix.mp4"
+          },
+          "loser": {
+            "id": "pyBwP7Pclyw_vidmuse_remix",
+            "file": "videos/pyBwP7Pclyw/vidmuse_remix.mp4"
+          }
+        },
+        "quality": {
+          "tie": false,
+          "winner": {
+            "id": "pyBwP7Pclyw_firefly_remix",
+            "file": "videos/pyBwP7Pclyw/firefly_remix.mp4"
+          },
+          "loser": {
+            "id": "pyBwP7Pclyw_vidmuse_remix",
+            "file": "videos/pyBwP7Pclyw/vidmuse_remix.mp4"
+          }
+        }
+      },
+      "ts": "2026-03-05T00:57:35.504Z"
+    }
+  ]
+}
