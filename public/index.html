@@ -13,13 +13,33 @@
     #submit-survey { padding: 15px 30px; font-size: 16px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }
     #progress-container { margin-top: 20px; }
     .hidden { display: none; }
+    #intro-container, #welcome-container { max-width: 760px; margin: 0 auto; }
+    .warning-box {
+      margin: 20px 0;
+      padding: 14px;
+      border: 1px solid #e39a00;
+      border-radius: 8px;
+      background-color: #fff7e6;
+      color: #7a4b00;
+      text-align: left;
+    }
   </style>
 </head>
 <body>
 
   <h1>🎵 Video-to-Music Retrieval Survey</h1>
 
-  <div id="welcome-container">
+  <div id="intro-container">
+    <h2>Introduction</h2>
+    <p>This task compares two video-music versions (A vs B) for each pair.</p>
+    <p>You will answer two questions per pair: global alignment and music audio quality.</p>
+    <div class="warning-box">
+      <strong>Warning:</strong> If you refresh this page or leave before final submission, your responses will not be saved.
+    </div>
+    <button id="proceed-to-id">Continue</button>
+  </div>
+
+  <div id="welcome-container" class="hidden">
     <h2>Welcome to the Survey</h2>
     <p>Please enter your participant ID to begin.</p>
     <input type="text" id="user-id" placeholder="Enter your ID">
@@ -71,7 +91,10 @@
     let userChoices = [];
     let currentPairIndex = 0;
     let userId = '';
+    let hasSubmitted = false;
 
+    const introContainer = document.getElementById('intro-container');
+    const proceedToIdBtn = document.getElementById('proceed-to-id');
     const welcomeContainer = document.getElementById('welcome-container');
     const userIdInput = document.getElementById('user-id');
     const startSurveyBtn = document.getElementById('start-survey');
@@ -83,6 +106,21 @@
     const submitSurveyBtn = document.getElementById('submit-survey');
     const progressText = document.getElementById('progress-text');
     const thankYou = document.getElementById('thank-you');
+
+    proceedToIdBtn.addEventListener('click', () => {
+      introContainer.classList.add('hidden');
+      welcomeContainer.classList.remove('hidden');
+      userIdInput.focus();
+    });
+
+    window.addEventListener('beforeunload', (event) => {
+      const surveyInProgress = !surveyContainer.classList.contains('hidden') && !hasSubmitted;
+      if (!surveyInProgress) {
+        return;
+      }
+      event.preventDefault();
+      event.returnValue = '';
+    });
 
     // Start Survey
     startSurveyBtn.addEventListener('click', async () => {
@@ -247,6 +285,7 @@
         body: JSON.stringify({ userId, votes })
       });
 
+      hasSubmitted = true;
       surveyContainer.classList.add('hidden');
       thankYou.classList.remove('hidden');
     });
