@@ -4,16 +4,15 @@ This project is a web-based survey tool for Video-to-Music Retrieval (VTMR) rese
 
 ## Features
 
-- **Multiple Surveys**: Configure multiple, independent surveys, each with its own set of videos.
-- **Pairwise Comparisons**: Automatically generates all possible pairs of videos for each survey (`nC2`).
-- **Dynamic Frontend**: A single-page application that dynamically loads and presents all video pairs in a random order.
-- **Flexible Configuration**: Easily add or modify surveys by editing a JSON configuration file.
+- **Directory-Based Surveys**: Each subdirectory under `videos/` is treated as one survey condition.
+- **Per-Participant Random Pairing**: For each new participant, the backend randomly samples 2 videos per directory to form one A/B pair.
+- **Dynamic Frontend**: A single-page application that loads and presents sampled pairs in random order.
 - **Detailed Data Collection**: Records user choices with timestamps, and full details of the video pair shown.
 
 ## How It Works
 
-1.  **Configuration**: Surveys are defined in `config/surveys.json`. Each survey consists of `n` pre-combined video files.
-2.  **Backend API**: The Node.js/Express backend reads the configuration, generates all possible video pairs, shuffles them, and serves them to the frontend. It also handles vote submissions.
+1.  **Directory Discovery**: The backend scans subdirectories in `videos/` and builds a video catalog.
+2.  **Backend API**: For each new survey session, the backend randomly samples 2 videos from each directory, shuffles all A/B pairs, and serves them to the frontend. It also handles vote submissions.
 3.  **Frontend Interface**: The frontend fetches the shuffled list of all video pairs and presents them to the user one by one for voting.
 4.  **Data Storage**: All responses are stored in `data/results.json`.
 
@@ -23,28 +22,22 @@ This project is a web-based survey tool for Video-to-Music Retrieval (VTMR) rese
 
 -   Place your pre-combined video files (with audio) in the `videos/` directory.
 
-### 2. Configure Your Surveys
+### 2. Organize Directory Structure
 
-Edit the `config/surveys.json` file to define your surveys. Each survey object has the following structure:
+Create one subdirectory per condition under `videos/`, and place candidate videos in each:
 
-```json
-{
-  "id": "unique_survey_id",
-  "name": "Survey Name",
-  "videos": [
-    { "id": "unique_video_id_1", "file": "videos/your_video_1.mp4", "description": "Internal description of video 1" },
-    { "id": "unique_video_id_2", "file": "videos/your_video_2.mp4", "description": "Internal description of video 2" },
-    { "id": "unique_video_id_3", "file": "videos/your_video_3.mp4", "description": "Internal description of video 3" }
-  ]
-}
+```text
+videos/
+  condition_a/
+    video1.mp4
+    video2.mp4
+    video3.mp4
+  condition_b/
+    video1.mp4
+    video2.mp4
 ```
 
--   **`id`**: A unique identifier for the survey (e.g., `"survey_01"`).
--   **`name`**: The display name of the survey.
--   **`videos`**: An array of pre-combined video objects.
-    -   **`id`**: A unique identifier for the video.
-    -   **`file`**: The path to the video file.
-    -   **`description`**: An internal note for you to identify the video (not shown to users).
+Each directory must contain at least 2 compatible video files (`.mp4`, `.webm`, `.ogg`).
 
 ### 3. Run the Application
 
