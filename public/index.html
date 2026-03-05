@@ -140,11 +140,22 @@
       }
     }
 
+    function isPairAnswered(index) {
+      const choice = userChoices[index];
+      return !!(choice && choice.global && choice.temporal && choice.quality);
+    }
+
+    function updateNavigationState() {
+      const isLastPair = currentPairIndex === allPairs.length - 1;
+      previousPairBtn.disabled = currentPairIndex === 0;
+      nextPairBtn.disabled = isLastPair || !isPairAnswered(currentPairIndex);
+      submitSurveyBtn.classList.toggle('hidden', !isLastPair);
+      submitSurveyBtn.disabled = !isPairAnswered(currentPairIndex);
+    }
+
     function loadPair() {
       // Update button states
-      previousPairBtn.disabled = currentPairIndex === 0;
-      nextPairBtn.disabled = currentPairIndex === allPairs.length - 1;
-      submitSurveyBtn.classList.toggle('hidden', currentPairIndex !== allPairs.length - 1);
+      updateNavigationState();
 
       updateSelectionStyle();
 
@@ -161,6 +172,7 @@
       }
       userChoices[currentPairIndex][question] = choice;
       updateSelectionStyle();
+      updateNavigationState();
     }
 
     // Add event listeners for all choice buttons
@@ -182,6 +194,11 @@
     });
 
     nextPairBtn.addEventListener('click', () => {
+      if (!isPairAnswered(currentPairIndex)) {
+        alert('Please answer all 3 questions before moving to the next pair.');
+        return;
+      }
+
       if (currentPairIndex < allPairs.length - 1) {
         currentPairIndex++;
         loadPair();
