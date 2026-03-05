@@ -1,11 +1,9 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
+
 const app = express();
 const PORT = process.env.PORT || 5555;
-const VIDEOS_DIR = path.join(__dirname, 'videos');
-const VIDEO_EXTENSIONS = new Set(['.mp4', '.webm', '.ogg']);
 const RESULTS_READ_TOKEN = process.env.RESULTS_READ_TOKEN || '';
 const ADMIN_API_TOKEN = process.env.ADMIN_API_TOKEN || '';
 
@@ -15,97 +13,182 @@ app.use(express.json());
 
 const dataDir = path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+
 const resultsFile = path.join(dataDir, 'results.json');
-if (!fs.existsSync(resultsFile) || fs.readFileSync(resultsFile, 'utf8').trim() === '') fs.writeFileSync(resultsFile, '{}', 'utf8');
+const userMappingsFile = path.join(dataDir, 'user_mappings.json');
+const assignmentsPublicFile = path.join(dataDir, 'test_case_assignments_public.json');
+const assignmentsPrivateMapFile = path.join(dataDir, 'test_case_assignments_private_map.json');
 
-// Create anonymous video mapping to hide real file paths
+function readJsonFile(filePath, fallbackValue) {
+  try {
+    if (!fs.existsSync(filePath)) return fallbackValue;
+    const raw = fs.readFileSync(filePath, 'utf8').trim();
+    if (!raw) return fallbackValue;
+    return JSON.parse(raw);
+  } catch (error) {
+    console.error(`Failed to read JSON file: ${filePath}`, error);
+    return fallbackValue;
+  }
+}
+
+function writeJsonFile(filePath, obj) {
+  fs.writeFileSync(filePath, JSON.stringify(obj, null, 2), 'utf8');
+}
+
+function ensureResultsFile() {
+  if (!fs.existsSync(resultsFile)) {
+    writeJsonFile(resultsFile, {});
+    return;
+  }
+  const raw = fs.readFileSync(resultsFile, 'utf8').trim();
+  if (!raw) {
+    writeJsonFile(resultsFile, {});
+  }
+}
+
+function normalizeMappings(raw) {
+  const base = {
+    byUsername: {},
+    byUserId: {},
+  };
+  if (!raw || typeof raw !== 'object') return base;
+  if (raw.byUsername && typeof raw.byUsername === 'object') base.byUsername = raw.byUsername;
+  if (raw.byUserId && typeof raw.byUserId === 'object') base.byUserId = raw.byUserId;
+  return base;
+}
+
+function ensureUserMappingsFile() {
+  if (!fs.existsSync(userMappingsFile)) {
+    writeJsonFile(userMappingsFile, normalizeMappings(null));
+    return;
+  }
+  const normalized = normalizeMappings(readJsonFile(userMappingsFile, null));
+  writeJsonFile(userMappingsFile, normalized);
+}
+
+ensureResultsFile();
+ensureUserMappingsFile();
+
+let assignmentsByUserId = {};
+let assignmentUserIds = [];
 const videoMapping = new Map();
-const reverseMapping = new Map();
-let videoCatalog = [];
 
-function shuffleInPlace(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
+function loadSurveyAssets() {
+  const publicPayload = readJsonFile(assignmentsPublicFile, null);
+  if (!publicPayload || typeof publicPayload !== 'object' || !publicPayload.users || typeof publicPayload.users !== 'object') {
+    throw new Error(`Invalid or missing assignments file: ${assignmentsPublicFile}`);
   }
-}
-
-function discoverVideoCatalog() {
-  if (!fs.existsSync(VIDEOS_DIR)) {
-    console.warn(`Video directory not found: ${VIDEOS_DIR}`);
-    return [];
+  assignmentsByUserId = publicPayload.users;
+  assignmentUserIds = Object.keys(assignmentsByUserId).sort();
+  if (!assignmentUserIds.length) {
+    throw new Error('No assigned user slots found in assignments file.');
   }
 
-  const subdirs = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort();
+  const privatePayload = readJsonFile(assignmentsPrivateMapFile, null);
+  if (!privatePayload || typeof privatePayload !== 'object' || !privatePayload.video_token_to_private || typeof privatePayload.video_token_to_private !== 'object') {
+    throw new Error(`Invalid or missing private map file: ${assignmentsPrivateMapFile}`);
+  }
 
-  return subdirs.map((subdir) => {
-    const subdirPath = path.join(VIDEOS_DIR, subdir);
-    const videos = fs.readdirSync(subdirPath, { withFileTypes: true })
-      .filter((entry) => entry.isFile())
-      .map((entry) => entry.name)
-      .filter((filename) => VIDEO_EXTENSIONS.has(path.extname(filename).toLowerCase()))
-      .sort()
-      .map((videoFile) => ({
-        file: `videos/${subdir}/${videoFile}`
-      }));
-
-    return {
-      id: `survey_${subdir}`,
-      name: subdir,
-      videos
-    };
-  });
-}
-
-function generateAnonVideoToken() {
-  return `v_${crypto.randomBytes(12).toString('hex')}`;
-}
-
-function createAnonymousMapping() {
   videoMapping.clear();
-  reverseMapping.clear();
-  videoCatalog = discoverVideoCatalog();
-
-  // Collect all video files first
-  const allVideoFiles = [];
-  videoCatalog.forEach((survey) => {
-    survey.videos.forEach((video) => {
-      allVideoFiles.push(video.file);
-    });
+  Object.entries(privatePayload.video_token_to_private).forEach(([token, meta]) => {
+    if (!meta || typeof meta !== 'object' || typeof meta.file !== 'string') return;
+    videoMapping.set(token, meta.file);
   });
 
-  // Create shuffled anonymous IDs
-  const used = new Set();
-  allVideoFiles.forEach((videoFile) => {
-    let anonId = generateAnonVideoToken();
-    while (used.has(anonId)) {
-      anonId = generateAnonVideoToken();
-    }
-    used.add(anonId);
-    videoMapping.set(anonId, videoFile);
-    reverseMapping.set(videoFile, anonId);
-  });
-
-  console.log(`🔀 Created ${allVideoFiles.length} shuffled anonymous video mappings from ${videoCatalog.length} directories`);
+  console.log(`📋 Loaded ${assignmentUserIds.length} user slots and ${videoMapping.size} video tokens`);
 }
 
-// Initialize mapping at startup
-createAnonymousMapping();
-
-// Refresh mappings when video files are updated
 function refreshMappings() {
   try {
-    createAnonymousMapping();
-    console.log('📋 Video mappings refreshed');
+    loadSurveyAssets();
+    console.log('📋 Survey mappings refreshed');
+    return true;
   } catch (error) {
-    console.error('Error refreshing mappings:', error);
+    console.error('Error refreshing survey mappings:', error);
+    return false;
   }
 }
 
-// API endpoint to refresh mappings
+loadSurveyAssets();
+
+function readResults() {
+  return readJsonFile(resultsFile, {}) || {};
+}
+
+function readUserMappings() {
+  const raw = readJsonFile(userMappingsFile, null);
+  return normalizeMappings(raw);
+}
+
+function normalizeUsername(raw) {
+  return String(raw || '').trim();
+}
+
+function usernameKey(username) {
+  return normalizeUsername(username).toLowerCase();
+}
+
+function allocateUserSlot(username) {
+  const normalized = normalizeUsername(username);
+  if (!normalized) {
+    return { error: 'Please provide a username.', status: 400 };
+  }
+
+  const key = usernameKey(normalized);
+  const mappings = readUserMappings();
+
+  const existing = mappings.byUsername[key];
+  if (existing && existing.userId) {
+    return { userId: existing.userId, mappings, username: normalized, created: false };
+  }
+
+  const availableUserId = assignmentUserIds.find((userId) => !mappings.byUserId[userId]);
+  if (!availableUserId) {
+    return { error: 'All participant slots are already taken.', status: 409 };
+  }
+
+  const record = {
+    username: normalized,
+    userId: availableUserId,
+    assignedAt: new Date().toISOString(),
+  };
+  mappings.byUsername[key] = record;
+  mappings.byUserId[availableUserId] = key;
+  writeJsonFile(userMappingsFile, mappings);
+  return { userId: availableUserId, mappings, username: normalized, created: true };
+}
+
+function getAssignedQuestions(userId) {
+  const questions = assignmentsByUserId[userId];
+  return Array.isArray(questions) ? questions : null;
+}
+
+function mapVideoFromAnonToken(videoObj) {
+  if (!videoObj || typeof videoObj !== 'object') return null;
+  const anonFile = String(videoObj.file || '');
+  const realFile = videoMapping.get(anonFile);
+  if (!realFile) return null;
+  const parsed = path.parse(realFile);
+  const subdir = path.basename(path.dirname(realFile));
+  const canonicalId = `${subdir}_${parsed.name}`;
+  return {
+    id: canonicalId,
+    file: realFile,
+  };
+}
+
+function verifyVoteMatchesAssignment(vote, expectedByQuestionNo) {
+  if (!vote || typeof vote !== 'object') return false;
+  const questionNo = Number(vote.question_no);
+  const expected = expectedByQuestionNo.get(questionNo);
+  if (!expected) return false;
+
+  const pair = Array.isArray(vote.pair) ? vote.pair : [];
+  if (pair.length !== 2) return false;
+  const tokens = [String(pair[0]?.file || ''), String(pair[1]?.file || '')].sort().join('|');
+  return tokens === expected;
+}
+
 app.post('/api/refresh-mappings', (req, res) => {
   if (!ADMIN_API_TOKEN) {
     return res.status(404).json({ error: 'Not found' });
@@ -113,132 +196,157 @@ app.post('/api/refresh-mappings', (req, res) => {
   if (req.query.token !== ADMIN_API_TOKEN) {
     return res.status(403).json({ error: 'Forbidden' });
   }
-  refreshMappings();
-  res.json({ ok: true, message: 'Mappings refreshed' });
-});
-
-function sampleTwoVideos(videos) {
-  const pickedIndices = new Set();
-  while (pickedIndices.size < 2) {
-    pickedIndices.add(Math.floor(Math.random() * videos.length));
+  const ok = refreshMappings();
+  if (!ok) {
+    return res.status(500).json({ ok: false, error: 'Failed to refresh mappings' });
   }
-  return [...pickedIndices].map((index) => videos[index]);
-}
-
-// API to get fresh A/B pairs for a participant (2 random videos per directory)
-app.get('/api/all-pairs', (req, res) => {
-  let allPairs = [];
-
-  videoCatalog.forEach((survey) => {
-    if (survey.videos.length < 2) {
-      return;
-    }
-
-    const sampledVideos = sampleTwoVideos(survey.videos);
-    const pair = sampledVideos.map((video) => ({ file: reverseMapping.get(video.file) }));
-
-    if (!pair[0].file || !pair[1].file) {
-      return;
-    }
-
-    if (Math.random() < 0.5) {
-      [pair[0], pair[1]] = [pair[1], pair[0]];
-    }
-
-    allPairs.push(pair);
-  });
-
-  // Shuffle the pair order shown to each participant
-  shuffleInPlace(allPairs);
-  res.json(allPairs);
+  return res.json({ ok: true, message: 'Mappings refreshed' });
 });
 
-// API to serve anonymous videos
+// Register username -> fixed user slot, then return that slot's predefined questions.
+app.post('/api/register-user', (req, res) => {
+  const { username } = req.body || {};
+  const allocation = allocateUserSlot(username);
+  if (allocation.error) {
+    return res.status(allocation.status || 409).json({ ok: false, error: allocation.error });
+  }
+
+  const userId = allocation.userId;
+  const questions = getAssignedQuestions(userId);
+  if (!questions) {
+    return res.status(500).json({ ok: false, error: `No assignment found for ${userId}` });
+  }
+
+  const results = readResults();
+  if (Object.prototype.hasOwnProperty.call(results, userId)) {
+    return res.status(409).json({
+      ok: false,
+      error: 'This assigned user slot has already submitted responses.',
+      alreadySubmitted: true,
+      userId,
+    });
+  }
+
+  return res.json({
+    ok: true,
+    userId,
+    username: allocation.username,
+    totalQuestions: questions.length,
+    pairs: questions,
+  });
+});
+
+// Optional endpoint for direct per-user assignment lookup.
+app.get('/api/all-pairs/:userId', (req, res) => {
+  const userId = String(req.params.userId || '');
+  const questions = getAssignedQuestions(userId);
+  if (!questions) {
+    return res.status(404).json({ ok: false, error: 'Assigned user slot not found' });
+  }
+  return res.json(questions);
+});
+
+// Compatibility endpoint: report whether username is already mapped/submitted.
+app.get('/api/check-user/:username', (req, res) => {
+  const key = usernameKey(req.params.username);
+  const mappings = readUserMappings();
+  const record = mappings.byUsername[key];
+  if (!record) {
+    return res.json({ exists: false, mapped: false, submitted: false });
+  }
+  const results = readResults();
+  const submitted = Object.prototype.hasOwnProperty.call(results, record.userId);
+  return res.json({ exists: true, mapped: true, submitted, userId: record.userId });
+});
+
+// Serve anonymous videos by token from private map.
 app.get('/api/video/:anonId', (req, res) => {
   const anonId = req.params.anonId;
   const realPath = videoMapping.get(anonId);
-  
   if (!realPath) {
     return res.status(404).json({ error: 'Video not found' });
   }
-  
   const videoPath = path.join(__dirname, realPath);
   if (!fs.existsSync(videoPath)) {
     return res.status(404).json({ error: 'Video file not found' });
   }
-  
-  res.sendFile(videoPath);
-});
-
-// API to check if a user ID already exists
-app.get('/api/check-user/:id', (req, res) => {
-  const userId = req.params.id;
-  fs.readFile(resultsFile, 'utf8', (err, data) => {
-    if (err) {
-      // If file doesn't exist or is unreadable, the user doesn't exist
-      return res.json({ exists: false });
-    }
-    const results = JSON.parse(data);
-    res.json({ exists: results.hasOwnProperty(userId) });
-  });
+  return res.sendFile(videoPath);
 });
 
 app.post('/api/submit', (req, res) => {
-  const { userId, votes } = req.body;
-  if (!userId || !votes || !Array.isArray(votes)) {
-    return res.status(400).json({ ok: false, error: 'Missing required fields' });
+  const { userId, username, votes } = req.body || {};
+  if (!userId || !username || !Array.isArray(votes)) {
+    return res.status(400).json({ ok: false, error: 'Missing required fields (userId, username, votes)' });
   }
 
-  // Map anonymous video IDs back to original file paths for research data
+  const normalizedUsername = normalizeUsername(username);
+  const userKey = usernameKey(normalizedUsername);
+  const mappings = readUserMappings();
+  const mappingRecord = mappings.byUsername[userKey];
+  if (!mappingRecord || mappingRecord.userId !== userId) {
+    return res.status(403).json({ ok: false, error: 'Username and assigned user ID do not match' });
+  }
+
+  const expectedQuestions = getAssignedQuestions(userId);
+  if (!expectedQuestions) {
+    return res.status(404).json({ ok: false, error: 'Assigned user slot not found' });
+  }
+  if (votes.length !== expectedQuestions.length) {
+    return res.status(400).json({
+      ok: false,
+      error: `Unexpected vote count: got ${votes.length}, expected ${expectedQuestions.length}`,
+    });
+  }
+
+  const expectedByQuestionNo = new Map();
+  expectedQuestions.forEach((question) => {
+    const qNo = Number(question.question_no);
+    const pair = Array.isArray(question.pair) ? question.pair : [];
+    if (pair.length !== 2) return;
+    const sig = [String(pair[0]?.file || ''), String(pair[1]?.file || '')].sort().join('|');
+    expectedByQuestionNo.set(qNo, sig);
+  });
+
+  const hasUnexpectedVote = votes.some((vote) => !verifyVoteMatchesAssignment(vote, expectedByQuestionNo));
+  if (hasUnexpectedVote) {
+    return res.status(400).json({ ok: false, error: 'Vote payload does not match assigned questions' });
+  }
+
+  const results = readResults();
+  if (Object.prototype.hasOwnProperty.call(results, userId)) {
+    return res.status(409).json({ ok: false, error: 'This assigned user slot has already submitted' });
+  }
+
   const votesWithOriginalPaths = votes.map((vote) => {
-    // Only trust anonymous token from client and resolve canonical server-side fields.
-    const mapVideo = (video) => {
-      if (!video || typeof video !== 'object') {
-        return null;
-      }
-      const anonFile = String(video.file || '');
-      const realFile = videoMapping.get(anonFile);
-      if (!realFile) {
-        return null;
-      }
-      const parsed = path.parse(realFile);
-      const subdir = path.basename(path.dirname(realFile));
-      const canonicalId = `${subdir}_${parsed.name}`;
-      return {
-        id: canonicalId,
-        file: realFile
-      };
-    };
+    const mappedPair = Array.isArray(vote.pair) ? vote.pair.map(mapVideoFromAnonToken) : [];
 
     const mappedResults = {};
-    // Map winners and losers for each metric
-    if (vote.results) {
-      for (const [metric, result] of Object.entries(vote.results)) {
+    if (vote.results && typeof vote.results === 'object') {
+      Object.entries(vote.results).forEach(([metric, result]) => {
         if (result && result.tie) {
           mappedResults[metric] = {
             tie: true,
             winner: null,
-            loser: null
+            loser: null,
           };
         } else {
           mappedResults[metric] = {
             tie: false,
-            winner: mapVideo(result?.winner),
-            loser: mapVideo(result?.loser)
+            winner: mapVideoFromAnonToken(result?.winner),
+            loser: mapVideoFromAnonToken(result?.loser),
           };
         }
-      }
+      });
     }
 
     return {
       ...vote,
-      pair: vote.pair.map(mapVideo),
-      results: mappedResults
+      pair: mappedPair,
+      results: mappedResults,
     };
   });
 
-  // Reject malformed or tampered payloads that contain unknown video tokens.
-  const hasInvalidVideoRef = votesWithOriginalPaths.some((vote) => {
+  const invalidPayload = votesWithOriginalPaths.some((vote) => {
     if (!Array.isArray(vote.pair) || vote.pair.length !== 2 || vote.pair.some((video) => !video)) {
       return true;
     }
@@ -246,40 +354,25 @@ app.post('/api/submit', (req, res) => {
       return true;
     }
     for (const result of Object.values(vote.results)) {
-      if (!result || typeof result !== 'object') {
-        return true;
-      }
-      if (result.tie === true) {
-        continue;
-      }
-      if (!result.winner || !result.loser) {
-        return true;
-      }
+      if (!result || typeof result !== 'object') return true;
+      if (result.tie === true) continue;
+      if (!result.winner || !result.loser) return true;
     }
     return false;
   });
-  if (hasInvalidVideoRef) {
+  if (invalidPayload) {
     return res.status(400).json({ ok: false, error: 'Invalid vote payload' });
   }
 
-  fs.readFile(resultsFile, 'utf8', (err, data) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ ok: false, error: 'Could not read results file' });
-    }
-    const results = JSON.parse(data);
+  results[userId] = votesWithOriginalPaths;
+  writeJsonFile(resultsFile, results);
 
-    // Save the votes with original file paths
-    results[userId] = votesWithOriginalPaths;
+  mappingRecord.completedAt = new Date().toISOString();
+  mappings.byUsername[userKey] = mappingRecord;
+  mappings.byUserId[userId] = userKey;
+  writeJsonFile(userMappingsFile, mappings);
 
-    fs.writeFile(resultsFile, JSON.stringify(results, null, 2), 'utf8', (err) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ ok: false, error: 'Could not save results' });
-      }
-      res.json({ ok: true });
-    });
-  });
+  return res.json({ ok: true });
 });
 
 app.get('/results', (req, res) => {
@@ -289,7 +382,7 @@ app.get('/results', (req, res) => {
   if (req.query.token !== RESULTS_READ_TOKEN) {
     return res.status(403).json({ error: 'Forbidden' });
   }
-  res.sendFile(resultsFile);
+  return res.sendFile(resultsFile);
 });
 
 app.listen(PORT, '0.0.0.0', () => console.log(`Listening on ${PORT}`));

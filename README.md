@@ -4,17 +4,18 @@ This project is a web-based survey tool for Video-to-Music Retrieval (VTMR) rese
 
 ## Features
 
-- **Directory-Based Surveys**: Each subdirectory under `videos/` is treated as one survey condition.
-- **Per-Participant Random Pairing**: For each new participant, the backend randomly samples 2 videos per directory to form one A/B pair.
-- **Dynamic Frontend**: A single-page application that loads and presents sampled pairs in random order.
+- **Predefined Assignment Surveys**: Uses generated assignment files (`data/test_case_assignments_public.json`) for fixed per-user question sets.
+- **Username-to-Slot Mapping**: Maps each entered username to a persistent internal user slot (`user_01` ... `user_30`).
+- **Dynamic Frontend**: A single-page application that loads and presents each user's assigned pairs.
 - **Detailed Data Collection**: Records user choices with timestamps, and full details of the video pair shown.
 
 ## How It Works
 
-1.  **Directory Discovery**: The backend scans subdirectories in `videos/` and builds a video catalog.
-2.  **Backend API**: For each new survey session, the backend randomly samples 2 videos from each directory, shuffles all A/B pairs, and serves them to the frontend. It also handles vote submissions.
-3.  **Frontend Interface**: The frontend fetches the shuffled list of all video pairs and presents them to the user one by one for voting.
-4.  **Data Storage**: All responses are stored in `data/results.json`.
+1.  **Username Registration**: The frontend sends a username to the backend.
+2.  **Slot Mapping**: The backend maps that username to one fixed assignment slot (`user_01` ... `user_30`) and persists this mapping in `data/user_mappings.json`.
+3.  **Predefined Assignment Delivery**: The backend returns the pre-generated question list for that slot from `data/test_case_assignments_public.json`.
+4.  **Survey Interface**: The frontend shows those fixed pairs and collects responses.
+5.  **Submission Storage**: The backend validates that submitted questions match the assigned slot, then stores responses in `data/results.json` under the mapped user ID.
 
 ## Usage
 
