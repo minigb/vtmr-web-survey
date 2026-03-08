@@ -13,36 +13,97 @@
     #submit-survey { padding: 15px 30px; font-size: 16px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }
     #progress-container { margin-top: 20px; }
     .hidden { display: none; }
-    #intro-container, #welcome-container { max-width: 760px; margin: 0 auto; }
-    .warning-box {
-      margin: 20px 0;
-      padding: 14px;
-      border: 1px solid #e39a00;
+    #intro-container { max-width: 1100px; margin: 0 auto; }
+    #welcome-container { max-width: 760px; margin: 0 auto; }
+    #proceed-to-id, #start-survey {
+      padding: 12px 28px;
+      font-size: 18px;
+      font-weight: 600;
+      border: none;
       border-radius: 8px;
-      background-color: #fff7e6;
-      color: #7a4b00;
+      cursor: pointer;
+      background-color: #1f7a3f;
+      color: #fff;
+    }
+    #proceed-to-id {
+      margin-top: 14px;
+    }
+    #proceed-to-id:hover, #start-survey:hover {
+      background-color: #196334;
+    }
+    .intro-section {
       text-align: left;
+      max-width: 780px;
+      margin: 0 auto;
+    }
+    .intro-section h3 {
+      margin-bottom: 8px;
+    }
+    .intro-list {
+      margin: 8px 0 12px;
+      padding-left: 22px;
+    }
+    .intro-list li {
+      margin: 6px 0;
+    }
+    .example-box {
+      margin: 16px auto;
+      padding: 12px 14px;
+      border: 1px solid #d5dbe3;
+      border-radius: 8px;
+      background-color: #f8fafc;
+      color: #334155;
+      text-align: center;
+    }
+    .note-box {
+      margin: 18px auto 0;
+      color: #c0392b;
+      text-align: center;
+      max-width: 780px;
+    }
+    .subtle-text {
+      color: #4b5563;
+      margin: 6px 0 14px;
+    }
+    .divider {
+      border: 0;
+      border-top: 1px solid #e5e7eb;
+      margin: 18px auto;
+      max-width: 780px;
     }
   </style>
 </head>
 <body>
 
   <h1>🎵 Video-to-Music Retrieval Survey</h1>
+  <p class="subtle-text"><strong>Estimated time:</strong> 20~30 minutes</p>
 
   <div id="intro-container">
-    <h2>Introduction</h2>
-    <p>This task compares two video-music versions (A vs B) for each pair.</p>
-    <p>You will answer two questions per pair: global alignment and music audio quality.</p>
-    <div class="warning-box">
-      <strong>Warning:</strong> If you refresh this page or leave before final submission, your responses will not be saved.
+    <div class="intro-section">
+      <h2>Task Overview</h2>
+      <p>You will compare two versions of the same video with different background music.</p>
+      <p><strong>You will evaluate 40 video pairs.</strong></p>
+      <p>For each pair, please choose:</p>
+      <ul class="intro-list">
+        <li>🎬 Which music better matches the video</li>
+        <li>🎧 Which music has better audio quality</li>
+      </ul>
+      <p>Please try to select <strong>A</strong> or <strong>B</strong> whenever possible rather than choosing <strong>Tie</strong>.</p>
+      <p>🔁 You may replay each video as many times as needed.</p>
+      <p>🔊 Please use headphones or ensure your audio is enabled before starting.</p>
+      <p>🔉 You may adjust the volume while answering. Please listen to the background music thoroughly before making each choice.</p>
+
     </div>
-    <button id="proceed-to-id">Continue</button>
+    <div class="note-box">
+      <strong>Note:</strong> If you refresh or leave this page before submitting, your responses may be lost.
+    </div>
+    <button id="proceed-to-id">Start Survey</button>
   </div>
 
   <div id="welcome-container" class="hidden">
     <h2>Welcome to the Survey</h2>
-    <p>Please enter your participant ID to begin.</p>
-    <input type="text" id="user-id" placeholder="Enter your ID">
+    <p>Please enter your username to begin.</p>
+    <input type="text" id="user-id" placeholder="Enter your username">
     <button id="start-survey">Start Survey</button>
   </div>
 
@@ -59,13 +120,13 @@
     </div>
     <div id="questions-container" style="margin-top: 20px; text-align: left; display: inline-block;">
       <div class="question-block">
-        <p>1) <strong>Global Alignment:</strong> Which background music better matches the overall content and mood of the video?</p>
+        <p>1) <strong>🎬 Video-Music Match:</strong> Which background music better matches the overall content and mood of the video?</p>
         <button class="choice-btn q1-btn" data-q="global" data-choice="A">A</button>
         <button class="choice-btn q1-btn" data-q="global" data-choice="B">B</button>
         <button class="choice-btn q1-btn" data-q="global" data-choice="TIE">Tie</button>
       </div>
       <div class="question-block">
-        <p>2) <strong>Music Audio Quality:</strong> Which music has better audio quality as a standalone track?</p>
+        <p>2) <strong>🎧 Audio Quality:</strong> Which music has better audio quality as a standalone track?</p>
         <button class="choice-btn q2-btn" data-q="quality" data-choice="A">A</button>
         <button class="choice-btn q2-btn" data-q="quality" data-choice="B">B</button>
         <button class="choice-btn q2-btn" data-q="quality" data-choice="TIE">Tie</button>
@@ -91,6 +152,7 @@
     let userChoices = [];
     let currentPairIndex = 0;
     let userId = '';
+    let username = '';
     let hasSubmitted = false;
 
     const introContainer = document.getElementById('intro-container');
@@ -124,28 +186,31 @@
 
     // Start Survey
     startSurveyBtn.addEventListener('click', async () => {
-      userId = userIdInput.value.trim();
-      if (!userId) {
-        alert('Please enter a participant ID.');
+      username = userIdInput.value.trim();
+      if (!username) {
+        alert('Please enter a username.');
         return;
       }
 
-      // Check for duplicate ID
-      const res = await fetch(`/api/check-user/${userId}`);
-      const { exists } = await res.json();
-      if (exists) {
-        alert('This participant ID has already been used. Please enter a unique ID.');
+      const res = await fetch('/api/register-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username })
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.ok) {
+        alert(payload.error || 'Could not register this username.');
         return;
       }
 
+      userId = payload.userId;
       welcomeContainer.classList.add('hidden');
-      loadSurvey();
+      loadSurvey(payload.pairs);
     });
 
-    // Fetch all pairs on load
-    async function loadSurvey() {
-      const res = await fetch('/api/all-pairs');
-      allPairs = await res.json();
+    // Load assigned survey pairs
+    async function loadSurvey(assignedPairs) {
+      allPairs = Array.isArray(assignedPairs) ? assignedPairs : [];
       if (allPairs.length > 0) {
         userChoices = new Array(allPairs.length).fill(null);
         surveyContainer.classList.remove('hidden');
@@ -189,7 +254,8 @@
 
       updateSelectionStyle();
 
-      const pair = allPairs[currentPairIndex];
+      const question = allPairs[currentPairIndex];
+      const pair = question.pair;
       // Use anonymous video API endpoints
       videoA.src = `/api/video/${pair[0].file}`;
       videoB.src = `/api/video/${pair[1].file}`;
@@ -265,25 +331,33 @@
         return;
       }
 
-      const votes = allPairs.map((pair, index) => {
+      const votes = allPairs.map((_, index) => {
+        const question = allPairs[index];
+        const pairData = question.pair;
         const choices = userChoices[index];
         return {
-          pair,
+          ...question,
+          pair: pairData,
           choices: choices,
           // Store winners/losers for each metric. Ties have no winner/loser.
           results: {
-            global: buildMetricResult(choices.global, pair),
-            quality: buildMetricResult(choices.quality, pair)
+            global: buildMetricResult(choices.global, pairData),
+            quality: buildMetricResult(choices.quality, pairData)
           },
           ts: new Date().toISOString()
         };
       });
 
-      await fetch('/api/submit', {
+      const submitRes = await fetch('/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, votes })
+        body: JSON.stringify({ userId, username, votes })
       });
+      const submitPayload = await submitRes.json();
+      if (!submitRes.ok || !submitPayload.ok) {
+        alert(submitPayload.error || 'Failed to submit survey.');
+        return;
+      }
 
       hasSubmitted = true;
       surveyContainer.classList.add('hidden');
