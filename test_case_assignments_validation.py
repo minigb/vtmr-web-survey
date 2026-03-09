@@ -27,11 +27,10 @@ PRIVATE_MAP_PATH = Path(
     os.environ.get("PRIVATE_MAP_JSON", "data/test_case_assignments_private_map.json")
 )
 RANDOM_SOURCE = "random_non_vidmuse"
-EXPECTED_USERS = 30
-EXPECTED_QUESTIONS_PER_USER = 40
-EXPECTED_VIDEOS_PER_USER = 20
-EXPECTED_QUESTIONS_PER_VIDEO_PER_USER = 2
-EXPECTED_RANDOM_QUESTIONS = 30
+DEFAULT_EXPECTED_USERS = 30
+DEFAULT_EXPECTED_QUESTIONS_PER_USER = 40
+DEFAULT_EXPECTED_QUESTIONS_PER_VIDEO_PER_USER = 2
+DEFAULT_EXPECTED_RANDOM_QUESTIONS = 30
 OPTION_ORDER = {"reference": 0, "vtmr": 1, "firefly": 2, "vidmuse": 3}
 
 
@@ -52,12 +51,38 @@ def load_private_case_map() -> dict[str, dict]:
 
 
 class TestCaseAssignmentsValidation(unittest.TestCase):
+    @staticmethod
+    def _int_or_default(value: object, default: int) -> int:
+        try:
+            if value is None:
+                return default
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.payload = load_assignments()
+        cls.meta = cls.payload.get("meta", {})
         cls.users = cls.payload["users"]
         cls.summary = cls.payload.get("summary", {})
         cls.private_case_map = load_private_case_map()
+        cls.expected_users = cls._int_or_default(
+            cls.meta.get("users"),
+            DEFAULT_EXPECTED_USERS,
+        )
+        cls.expected_questions_per_user = cls._int_or_default(
+            cls.meta.get("questions_per_user"),
+            DEFAULT_EXPECTED_QUESTIONS_PER_USER,
+        )
+        cls.expected_random_questions = cls._int_or_default(
+            cls.meta.get("random_questions"),
+            DEFAULT_EXPECTED_RANDOM_QUESTIONS,
+        )
+        cls.expected_questions_per_video_per_user = DEFAULT_EXPECTED_QUESTIONS_PER_VIDEO_PER_USER
+        cls.expected_videos_per_user = (
+            cls.expected_questions_per_user // cls.expected_questions_per_video_per_user
+        )
         first_user = next(iter(cls.users.values()), [])
         first_question = first_user[0] if first_user else {}
         cls.is_public_format = "case_token" in first_question and "case_id" not in first_question
@@ -188,16 +213,16 @@ class TestCaseAssignmentsValidation(unittest.TestCase):
 
     @classmethod
     def _check_1_status(cls) -> tuple[bool, str]:
-        if len(cls.users) != EXPECTED_USERS:
+        if len(cls.users) != cls.expected_users:
             return False, f"user_count={len(cls.users)}"
         for user_id, questions in cls.users.items():
-            if len(questions) != EXPECTED_QUESTIONS_PER_USER:
+            if len(questions) != cls.expected_questions_per_user:
                 return False, f"{user_id} question_count={len(questions)}"
             by_video = Counter(q["video_id"] for q in questions)
-            if len(by_video) != EXPECTED_VIDEOS_PER_USER:
+            if len(by_video) != cls.expected_videos_per_user:
                 return False, f"{user_id} unique_videos={len(by_video)}"
             for video_id, count in by_video.items():
-                if count != EXPECTED_QUESTIONS_PER_VIDEO_PER_USER:
+                if count != cls.expected_questions_per_video_per_user:
                     return False, f"{user_id} {video_id} count={count}"
         return True, f"{len(cls.users)} users checked"
 
@@ -230,8 +255,10 @@ class TestCaseAssignmentsValidation(unittest.TestCase):
         if not by_video_counts:
             return False, "no per-video counts"
         for video_id, counts in by_video_counts.items():
-            if len(set(counts.values())) != 1:
-                return False, f"{video_id} counts={sorted(set(counts.values()))}"
+            values = list(counts.values())
+            spread = max(values) - min(values) if values else 0
+            if spread > 1:
+                return False, f"{video_id} count_spread={spread}"
         return True, f"{len(by_video_counts)} videos checked"
 
     @classmethod
@@ -252,7 +279,8 @@ class TestCaseAssignmentsValidation(unittest.TestCase):
                         break
                 if not exclusion_ok:
                     break
-        ok = random_count == EXPECTED_RANDOM_QUESTIONS and exclusion_ok and len(random_distribution) > 0
+        has_distribution = len(random_distribution) > 0 if cls.expected_random_questions > 0 else True
+        ok = random_count == cls.expected_random_questions and exclusion_ok and has_distribution
         return ok, f"random_count={random_count}, exclusion_ok={exclusion_ok}"
 
     @classmethod
@@ -264,12 +292,16 @@ class TestCaseAssignmentsValidation(unittest.TestCase):
 
         fmt = "public/tokenized" if cls.is_public_format else "internal"
         print(f"\nValidation report ({fmt}) for {ASSIGNMENTS_PATH}:")
-        print(f"- [{'PASS' if status_1 else 'FAIL'}] Per-user 20 videos x 2 questions ({msg_1})")
-        print(f"- [{'PASS' if status_2 else 'FAIL'}] Total combination uniformity within each video ({msg_2})")
+        print(
+            f"- [{'PASS' if status_1 else 'FAIL'}] "
+            f"Per-user {cls.expected_videos_per_user} videos x {cls.expected_questions_per_video_per_user} questions "
+            f"({msg_1})"
+        )
+        print(f"- [{'PASS' if status_2 else 'FAIL'}] Total combination near-uniformity within each video ({msg_2})")
         print(f"- [{'PASS' if status_3 else 'FAIL'}] Random sample count/exclusion ({msg_3})")
 
         label = "case_token" if cls.is_public_format else "case_id"
-        print(f"\nRandom 30-sample distribution ({label}):")
+        print(f"\nRandom {cls.expected_random_questions}-sample distribution ({label}):")
         for case_name, count in sorted(random_distribution.items(), key=lambda item: (-item[1], item[0])):
             print(f"  {case_name}: {count}")
         if not random_distribution:
@@ -289,23 +321,23 @@ class TestCaseAssignmentsValidation(unittest.TestCase):
                     print(f"    - {video_id}: {candidate_text} ({count})")
 
     def test_1_user_has_20_videos_and_two_questions_per_video(self) -> None:
-        self.assertEqual(len(self.users), EXPECTED_USERS, "Unexpected user count")
+        self.assertEqual(len(self.users), self.expected_users, "Unexpected user count")
         for user_id, questions in self.users.items():
             self.assertEqual(
                 len(questions),
-                EXPECTED_QUESTIONS_PER_USER,
+                self.expected_questions_per_user,
                 f"{user_id}: unexpected question count",
             )
             by_video = Counter(q["video_id"] for q in questions)
             self.assertEqual(
                 len(by_video),
-                EXPECTED_VIDEOS_PER_USER,
-                f"{user_id}: expected {EXPECTED_VIDEOS_PER_USER} unique videos, got {len(by_video)}",
+                self.expected_videos_per_user,
+                f"{user_id}: expected {self.expected_videos_per_user} unique videos, got {len(by_video)}",
             )
             for video_id, count in sorted(by_video.items()):
                 self.assertEqual(
                     count,
-                    EXPECTED_QUESTIONS_PER_VIDEO_PER_USER,
+                    self.expected_questions_per_video_per_user,
                     f"{user_id}: video {video_id} appears {count} times",
                 )
 
@@ -341,11 +373,12 @@ class TestCaseAssignmentsValidation(unittest.TestCase):
                 0,
                 f"{video_id}: no non-random combinations found",
             )
-            unique_counts = set(counts.values())
-            self.assertEqual(
-                len(unique_counts),
+            values = list(counts.values())
+            spread = max(values) - min(values) if values else 0
+            self.assertLessEqual(
+                spread,
                 1,
-                f"{video_id}: total combination counts are not uniform: {sorted(unique_counts)}",
+                f"{video_id}: total combination counts are not near-uniform (max-min={spread})",
             )
 
     def test_3_random_case_count_and_exclusion(self) -> None:
@@ -354,7 +387,7 @@ class TestCaseAssignmentsValidation(unittest.TestCase):
             random_count = int(source_counts.get("random_extra", source_counts.get(RANDOM_SOURCE, 0)))
             self.assertEqual(
                 random_count,
-                EXPECTED_RANDOM_QUESTIONS,
+                self.expected_random_questions,
                 "Unexpected random question count in public summary",
             )
 
@@ -376,14 +409,15 @@ class TestCaseAssignmentsValidation(unittest.TestCase):
 
             self.assertEqual(
                 sum(random_case_counts.values()),
-                EXPECTED_RANDOM_QUESTIONS,
+                self.expected_random_questions,
                 "Random token-count sum does not match expected random question count",
             )
             self.assertTrue(
                 bool(self.summary.get("random_exclusion_valid", False)),
                 "Public summary says random exclusion is invalid",
             )
-            self.assertGreater(len(random_case_counts), 0, "No random case counts found")
+            if self.expected_random_questions > 0:
+                self.assertGreater(len(random_case_counts), 0, "No random case counts found")
             return
 
         random_questions = [
@@ -394,7 +428,7 @@ class TestCaseAssignmentsValidation(unittest.TestCase):
         ]
         self.assertEqual(
             len(random_questions),
-            EXPECTED_RANDOM_QUESTIONS,
+            self.expected_random_questions,
             "Unexpected random question count",
         )
 
@@ -408,7 +442,8 @@ class TestCaseAssignmentsValidation(unittest.TestCase):
             )
 
         # This assert gives a compact "count which combination is randomly selected" report.
-        self.assertGreater(len(random_case_counts), 0, "No random case counts found")
+        if self.expected_random_questions > 0:
+            self.assertGreater(len(random_case_counts), 0, "No random case counts found")
 
 
 if __name__ == "__main__":

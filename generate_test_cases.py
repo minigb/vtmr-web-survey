@@ -12,6 +12,7 @@ Default behavior:
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
 import heapq
 import itertools
@@ -111,6 +112,339 @@ def make_question(case: Case, source: str, rng: random.Random) -> dict:
         "case_id": case.case_id,
         "source": source,
         "pair": pair,
+    }
+
+
+def user_id_from_index(index: int) -> str:
+    return f"user_{index:02d}"
+
+
+def case_includes_option(case: Case, option: str) -> bool:
+    return case.a.option == option or case.b.option == option
+
+
+def pair_case_tokens(
+    case_counts: dict[str, int],
+    users: int,
+    rng: random.Random,
+    preferred_case_ids: set[str] | None = None,
+) -> list[tuple[str, str]]:
+    """Pair per-case tokens into `users` distinct pairs.
+
+    Preference is a tie-breaker only; counts are always respected.
+    """
+    if users < 0:
+        raise ValueError(f"users must be >= 0, got {users}")
+    total = sum(case_counts.values())
+    if total != users * 2:
+        raise ValueError(f"Per-video token total must be {users * 2}, got {total}")
+    if users == 0:
+        return []
+    if max(case_counts.values(), default=0) > users:
+        raise ValueError(f"Case distribution too skewed for distinct pairing: {case_counts}")
+
+    preferred_case_ids = preferred_case_ids or set()
+    heap: list[tuple[int, int, float, str]] = []
+    for case_id, count in case_counts.items():
+        if count <= 0:
+            continue
+        preference_rank = 0 if case_id in preferred_case_ids else 1
+        heapq.heappush(heap, (-count, preference_rank, rng.random(), case_id))
+
+    pairs: list[tuple[str, str]] = []
+    while heap:
+        if len(heap) < 2:
+            raise ValueError(f"Pairing failed; leftover token for case {heap[0][3]}")
+        neg1, _, _, case1 = heapq.heappop(heap)
+        neg2, _, _, case2 = heapq.heappop(heap)
+        pairs.append((case1, case2))
+
+        count1 = -neg1 - 1
+        count2 = -neg2 - 1
+        if count1 > 0:
+            preference_rank = 0 if case1 in preferred_case_ids else 1
+            heapq.heappush(heap, (-count1, preference_rank, rng.random(), case1))
+        if count2 > 0:
+            preference_rank = 0 if case2 in preferred_case_ids else 1
+            heapq.heappush(heap, (-count2, preference_rank, rng.random(), case2))
+
+    if len(pairs) != users:
+        raise ValueError(f"Expected {users} pairs for a video, got {len(pairs)}")
+    return pairs
+
+
+def plan_additional_case_counts(
+    video_cases: list[Case],
+    existing_counts: Counter[str],
+    additional_slots: int,
+    exclude_option: str,
+    rng: random.Random,
+) -> dict[str, int]:
+    """Allocate additional slots with near-uniform counts and a no-excluded-option tie-break."""
+    if additional_slots < 0:
+        raise ValueError(f"additional_slots must be >= 0, got {additional_slots}")
+
+    counts = {case.case_id: int(existing_counts.get(case.case_id, 0)) for case in video_cases}
+    non_excluded = {case.case_id for case in video_cases if not case_includes_option(case, exclude_option)}
+
+    for _ in range(additional_slots):
+        min_count = min(counts.values(), default=0)
+        low_pool = [case_id for case_id, count in counts.items() if count == min_count]
+        preferred_pool = [case_id for case_id in low_pool if case_id in non_excluded]
+        pick_pool = preferred_pool if preferred_pool else low_pool
+        chosen = rng.choice(pick_pool)
+        counts[chosen] += 1
+
+    return {
+        case.case_id: counts[case.case_id] - int(existing_counts.get(case.case_id, 0))
+        for case in video_cases
+    }
+
+
+def order_questions_two_rounds(
+    user_id: str,
+    user_questions: list[dict],
+    video_ids: list[str],
+    num_videos: int,
+    questions_per_user: int,
+    rng: random.Random,
+) -> list[dict]:
+    by_video_questions: dict[str, list[dict]] = defaultdict(list)
+    for q in user_questions:
+        by_video_questions[q["video_id"]].append(q)
+    if len(by_video_questions) != num_videos:
+        raise ValueError(f"{user_id} has {len(by_video_questions)} videos, expected {num_videos}")
+    for video_id, qs in by_video_questions.items():
+        if len(qs) != 2:
+            raise ValueError(f"{user_id} video {video_id} has {len(qs)} questions, expected 2")
+        rng.shuffle(qs)
+
+    first_round_video_order = video_ids[:]
+    second_round_video_order = video_ids[:]
+    rng.shuffle(first_round_video_order)
+    rng.shuffle(second_round_video_order)
+
+    ordered_questions: list[dict] = []
+    for video_id in first_round_video_order:
+        ordered_questions.append(by_video_questions[video_id].pop())
+    for video_id in second_round_video_order:
+        ordered_questions.append(by_video_questions[video_id].pop())
+
+    if len(ordered_questions) != questions_per_user:
+        raise ValueError(
+            f"{user_id} ordered questions length={len(ordered_questions)}, expected {questions_per_user}"
+        )
+    for i, q in enumerate(ordered_questions, start=1):
+        q["question_no"] = i
+    return ordered_questions
+
+
+def load_locked_user_assignments(
+    assignments_json: Path,
+    locked_users: int,
+    questions_per_user: int,
+    case_lookup: dict[str, Case],
+) -> dict[str, list[dict]]:
+    if not assignments_json.exists():
+        raise ValueError(
+            f"Locked assignment source not found: {assignments_json}. "
+            "Cannot preserve existing users."
+        )
+
+    payload = json.loads(assignments_json.read_text(encoding="utf-8"))
+    users_obj = payload.get("users")
+    if not isinstance(users_obj, dict):
+        raise ValueError(f"Invalid locked assignment file (missing users dict): {assignments_json}")
+
+    out: dict[str, list[dict]] = {}
+    missing: list[str] = []
+    for idx in range(1, locked_users + 1):
+        user_id = user_id_from_index(idx)
+        if user_id not in users_obj:
+            missing.append(user_id)
+            continue
+        questions = copy.deepcopy(users_obj[user_id])
+        if len(questions) != questions_per_user:
+            raise ValueError(
+                f"{user_id} in {assignments_json} has {len(questions)} questions, "
+                f"expected {questions_per_user}"
+            )
+        for q in questions:
+            case_id = q.get("case_id")
+            if case_id not in case_lookup:
+                raise ValueError(
+                    f"{user_id} has unknown case_id={case_id} in locked assignment source: "
+                    f"{assignments_json}"
+                )
+        out[user_id] = questions
+
+    if missing:
+        raise ValueError(
+            "Locked assignment source does not contain all required users. "
+            f"Missing: {', '.join(missing)}"
+        )
+    return out
+
+
+def generate_assignments_extending_locked(
+    cases: list[Case],
+    users: int,
+    questions_per_user: int,
+    balanced_questions: int,
+    random_questions: int,
+    random_exclude_option: str,
+    max_random_per_case: int,
+    seed: int,
+    locked_assignments: dict[str, list[dict]],
+) -> dict:
+    if not cases:
+        raise ValueError("No valid cases discovered from the videos directory.")
+    if max_random_per_case < 1:
+        raise ValueError(f"max_random_per_case must be >= 1, got {max_random_per_case}")
+
+    total_questions = users * questions_per_user
+    requested_total = balanced_questions + random_questions
+    if requested_total != total_questions:
+        raise ValueError(
+            "Total mismatch: users * questions_per_user must equal "
+            "balanced_questions + random_questions "
+            f"({total_questions} != {requested_total})"
+        )
+
+    rng = random.Random(seed)
+    case_lookup = {case.case_id: case for case in cases}
+    by_video = cases_by_video(cases)
+    video_ids = list(by_video.keys())
+    num_videos = len(by_video)
+    expected_questions_per_user = num_videos * 2
+    if expected_questions_per_user != questions_per_user:
+        raise ValueError(
+            f"questions_per_user must be num_videos * 2 ({expected_questions_per_user}), "
+            f"got {questions_per_user}"
+        )
+
+    total_user_ids = [user_id_from_index(i) for i in range(1, users + 1)]
+    locked_user_ids = sorted(locked_assignments.keys(), key=lambda user_id: int(user_id.split("_")[1]))
+    if len(locked_user_ids) > users:
+        raise ValueError(
+            f"Locked users ({len(locked_user_ids)}) exceed requested users ({users}). "
+            "Increase --users or reduce --locked-users."
+        )
+    new_user_ids = [user_id for user_id in total_user_ids if user_id not in locked_assignments]
+
+    assignments: dict[str, list[dict]] = {}
+    for user_id in locked_user_ids:
+        assignments[user_id] = copy.deepcopy(locked_assignments[user_id])
+    for user_id in new_user_ids:
+        assignments[user_id] = []
+
+    locked_case_counts = Counter(
+        q["case_id"] for user_id in locked_user_ids for q in assignments[user_id]
+    )
+    new_occurrences_per_case: defaultdict[str, list[dict]] = defaultdict(list)
+
+    for video_id in video_ids:
+        video_cases = by_video[video_id]
+        existing_counts = Counter({case.case_id: locked_case_counts.get(case.case_id, 0) for case in video_cases})
+        additional_counts = plan_additional_case_counts(
+            video_cases=video_cases,
+            existing_counts=existing_counts,
+            additional_slots=len(new_user_ids) * 2,
+            exclude_option=random_exclude_option,
+            rng=rng,
+        )
+        preferred_case_ids = {
+            case.case_id for case in video_cases if not case_includes_option(case, random_exclude_option)
+        }
+        case_pairs = pair_case_tokens(
+            case_counts=additional_counts,
+            users=len(new_user_ids),
+            rng=rng,
+            preferred_case_ids=preferred_case_ids,
+        )
+        rng.shuffle(case_pairs)
+        for user_id, (case1_id, case2_id) in zip(new_user_ids, case_pairs):
+            for case_id in (case1_id, case2_id):
+                q = make_question(case_lookup[case_id], "balanced", rng)
+                assignments[user_id].append(q)
+                new_occurrences_per_case[case_id].append(q)
+
+    # Preserve existing random tags; only mark additional random questions on new users.
+    locked_random_per_case = Counter(
+        q["case_id"]
+        for user_id in locked_user_ids
+        for q in assignments[user_id]
+        if q.get("source") == "random_non_vidmuse"
+    )
+    locked_random_total = sum(locked_random_per_case.values())
+    if random_questions < locked_random_total:
+        raise ValueError(
+            "random_questions is smaller than locked random assignments. "
+            f"locked_random={locked_random_total}, requested={random_questions}"
+        )
+    additional_random_needed = random_questions - locked_random_total
+
+    eligible_case_ids = [
+        case.case_id
+        for case in cases
+        if case.a.option != random_exclude_option and case.b.option != random_exclude_option
+    ]
+    if additional_random_needed > 0 and not eligible_case_ids:
+        raise ValueError(
+            f"No eligible cases for random sampling when excluding '{random_exclude_option}'."
+        )
+
+    random_needed_per_case: Counter[str] = Counter()
+    if additional_random_needed > 0:
+        capped_pool: list[str] = []
+        for case_id in eligible_case_ids:
+            remaining_cap = max_random_per_case - int(locked_random_per_case.get(case_id, 0))
+            if remaining_cap <= 0:
+                continue
+            cap = min(remaining_cap, len(new_occurrences_per_case.get(case_id, [])))
+            if cap > 0:
+                capped_pool.extend([case_id] * cap)
+        if len(capped_pool) < additional_random_needed:
+            raise ValueError(
+                "Random sampling infeasible for new users with current cap. "
+                f"need={additional_random_needed}, pool={len(capped_pool)}, "
+                f"max_random_per_case={max_random_per_case}"
+            )
+        random_needed_per_case = Counter(rng.sample(capped_pool, additional_random_needed))
+
+    for case_id, random_needed in random_needed_per_case.items():
+        if random_needed <= 0:
+            continue
+        pool = new_occurrences_per_case.get(case_id, [])
+        if random_needed > len(pool):
+            raise ValueError(
+                f"Random source assignment overflow for {case_id}: need {random_needed}, have {len(pool)}"
+            )
+        for q in rng.sample(pool, random_needed):
+            q["source"] = "random_non_vidmuse"
+
+    for user_id in new_user_ids:
+        user_questions = assignments[user_id]
+        if len(user_questions) != questions_per_user:
+            raise ValueError(f"{user_id} has {len(user_questions)} questions, expected {questions_per_user}")
+        assignments[user_id] = order_questions_two_rounds(
+            user_id=user_id,
+            user_questions=user_questions,
+            video_ids=video_ids,
+            num_videos=num_videos,
+            questions_per_user=questions_per_user,
+            rng=rng,
+        )
+
+    for user_id in locked_user_ids:
+        if len(assignments[user_id]) != questions_per_user:
+            raise ValueError(
+                f"Locked {user_id} has {len(assignments[user_id])} questions, expected {questions_per_user}"
+            )
+
+    return {
+        "seed": seed,
+        "users": {user_id: assignments[user_id] for user_id in total_user_ids},
     }
 
 
@@ -577,14 +911,15 @@ def validate_internal_assignments(payload: dict) -> tuple[list[tuple[str, bool, 
     uniform_ok = True
     uniform_issue = ""
     for video_id, counts in sorted(by_video_counts.items()):
-        values = set(counts.values())
-        if len(values) != 1:
+        values = list(counts.values())
+        spread = max(values) - min(values) if values else 0
+        if spread > 1:
             uniform_ok = False
-            uniform_issue = f"{video_id} non-random counts={sorted(values)}"
+            uniform_issue = f"{video_id} count_spread={spread}"
             break
     checks.append(
         (
-            "Total combination uniformity within each video",
+            "Total combination near-uniformity within each video",
             uniform_ok,
             uniform_issue or f"{len(by_video_counts)} videos checked",
         )
@@ -621,18 +956,19 @@ def random_distribution_from_public_summary(public_payload: dict) -> Counter[str
 
 def print_validation_report(payload: dict, public_payload: dict) -> None:
     checks, random_case_counts = validate_internal_assignments(payload)
+    expected_random = int(payload.get("meta", {}).get("random_questions", 0))
 
     print("\nValidation report:")
     for name, ok, msg in checks:
         status = "PASS" if ok else "FAIL"
         print(f"- [{status}] {name} ({msg})")
 
-    print("\nRandom 30-sample distribution (internal case_id):")
+    print(f"\nRandom {expected_random}-sample distribution (internal case_id):")
     for case_id, count in sorted(random_case_counts.items(), key=lambda item: (-item[1], item[0])):
         print(f"  {case_id}: {count}")
 
     random_token_counts = random_distribution_from_public_summary(public_payload)
-    print("\nRandom 30-sample distribution (public case_token):")
+    print(f"\nRandom {expected_random}-sample distribution (public case_token):")
     for token, count in sorted(random_token_counts.items(), key=lambda item: (-item[1], item[0])):
         print(f"  {token}: {count}")
 
@@ -642,11 +978,17 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--videos-dir", type=Path, default=Path("videos"))
     parser.add_argument("--users", type=int, default=30)
     parser.add_argument("--questions-per-user", type=int, default=40)
-    parser.add_argument("--balanced-questions", type=int, default=1170)
-    parser.add_argument("--random-questions", type=int, default=30)
+    parser.add_argument("--balanced-questions", type=int, default=None)
+    parser.add_argument("--random-questions", type=int, default=None)
     parser.add_argument("--random-exclude-option", type=str, default="vidmuse")
     parser.add_argument("--max-random-per-case", type=int, default=2)
     parser.add_argument("--seed", type=int, default=20260305)
+    parser.add_argument("--locked-users", type=int, default=30)
+    parser.add_argument(
+        "--locked-assignments-json",
+        type=Path,
+        default=Path("data/test_case_assignments.json"),
+    )
     parser.add_argument("--output-json", type=Path, default=Path("data/test_case_assignments.json"))
     parser.add_argument("--output-csv", type=Path, default=Path("data/test_case_assignments.csv"))
     parser.add_argument(
@@ -669,18 +1011,62 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Iterable[str] | None = None) -> int:
     args = parse_args(argv)
+    if args.users < 1:
+        raise ValueError(f"--users must be >= 1, got {args.users}")
+    if args.questions_per_user < 1:
+        raise ValueError(f"--questions-per-user must be >= 1, got {args.questions_per_user}")
+    if args.locked_users < 0:
+        raise ValueError(f"--locked-users must be >= 0, got {args.locked_users}")
+
+    total_questions = args.users * args.questions_per_user
+    random_questions = args.random_questions if args.random_questions is not None else args.users
+    balanced_questions = (
+        args.balanced_questions
+        if args.balanced_questions is not None
+        else total_questions - random_questions
+    )
+    if random_questions < 0:
+        raise ValueError(f"--random-questions must be >= 0, got {random_questions}")
+    if balanced_questions < 0:
+        raise ValueError(f"--balanced-questions must be >= 0, got {balanced_questions}")
+    if balanced_questions + random_questions != total_questions:
+        raise ValueError(
+            "Total mismatch: users * questions_per_user must equal "
+            "balanced_questions + random_questions "
+            f"({total_questions} != {balanced_questions + random_questions})"
+        )
 
     cases, per_video_candidates = discover_cases(args.videos_dir)
-    assignments = generate_assignments(
-        cases=cases,
-        users=args.users,
-        questions_per_user=args.questions_per_user,
-        balanced_questions=args.balanced_questions,
-        random_questions=args.random_questions,
-        random_exclude_option=args.random_exclude_option,
-        max_random_per_case=args.max_random_per_case,
-        seed=args.seed,
-    )
+    if args.users > args.locked_users:
+        case_lookup = {case.case_id: case for case in cases}
+        locked_assignments = load_locked_user_assignments(
+            assignments_json=args.locked_assignments_json,
+            locked_users=args.locked_users,
+            questions_per_user=args.questions_per_user,
+            case_lookup=case_lookup,
+        )
+        assignments = generate_assignments_extending_locked(
+            cases=cases,
+            users=args.users,
+            questions_per_user=args.questions_per_user,
+            balanced_questions=balanced_questions,
+            random_questions=random_questions,
+            random_exclude_option=args.random_exclude_option,
+            max_random_per_case=args.max_random_per_case,
+            seed=args.seed,
+            locked_assignments=locked_assignments,
+        )
+    else:
+        assignments = generate_assignments(
+            cases=cases,
+            users=args.users,
+            questions_per_user=args.questions_per_user,
+            balanced_questions=balanced_questions,
+            random_questions=random_questions,
+            random_exclude_option=args.random_exclude_option,
+            max_random_per_case=args.max_random_per_case,
+            seed=args.seed,
+        )
     summary = build_summary(assignments, cases, per_video_candidates)
 
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
@@ -690,8 +1076,8 @@ def main(argv: Iterable[str] | None = None) -> int:
             "seed": args.seed,
             "users": args.users,
             "questions_per_user": args.questions_per_user,
-            "balanced_questions": args.balanced_questions,
-            "random_questions": args.random_questions,
+            "balanced_questions": balanced_questions,
+            "random_questions": random_questions,
             "random_exclude_option": args.random_exclude_option,
             "max_random_per_case": args.max_random_per_case,
         },
