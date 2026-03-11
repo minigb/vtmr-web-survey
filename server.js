@@ -6,6 +6,7 @@ const app = express();
 const PORT = process.env.PORT || 5555;
 const RESULTS_READ_TOKEN = process.env.RESULTS_READ_TOKEN || '';
 const ADMIN_API_TOKEN = process.env.ADMIN_API_TOKEN || '';
+const ACCEPT_RESPONSES = String(process.env.ACCEPT_RESPONSES || 'false').toLowerCase() === 'true';
 
 app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
@@ -189,6 +190,14 @@ function verifyVoteMatchesAssignment(vote, expectedByQuestionNo) {
   return tokens === expected;
 }
 
+function rejectClosedSurvey(res) {
+  return res.status(403).json({
+    ok: false,
+    error: 'Survey is closed. We are no longer accepting responses.',
+    acceptingResponses: false,
+  });
+}
+
 app.post('/api/refresh-mappings', (req, res) => {
   if (!ADMIN_API_TOKEN) {
     return res.status(404).json({ error: 'Not found' });
@@ -205,6 +214,10 @@ app.post('/api/refresh-mappings', (req, res) => {
 
 // Register username -> fixed user slot, then return that slot's predefined questions.
 app.post('/api/register-user', (req, res) => {
+  if (!ACCEPT_RESPONSES) {
+    return rejectClosedSurvey(res);
+  }
+
   const { username } = req.body || {};
   const allocation = allocateUserSlot(username);
   if (allocation.error) {
@@ -274,6 +287,10 @@ app.get('/api/video/:anonId', (req, res) => {
 });
 
 app.post('/api/submit', (req, res) => {
+  if (!ACCEPT_RESPONSES) {
+    return rejectClosedSurvey(res);
+  }
+
   const { userId, username, votes } = req.body || {};
   if (!userId || !username || !Array.isArray(votes)) {
     return res.status(400).json({ ok: false, error: 'Missing required fields (userId, username, votes)' });
