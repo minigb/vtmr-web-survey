@@ -2,7 +2,4 @@
 data*/*
 videos*/
 
-# Analysis results
-*.csv
-
 __pycache__/
